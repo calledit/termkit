@@ -7,4 +7,7 @@ PageUp and Down to scroll,
 There seams to be somthing weird with ncurses(https://github.com/mscdex/node-ncurses/issues/38) sometimes when aloot of stuff is
 printed some printed lines just goes away.
 
+![Facebook screenshot](/misc/Facebook.png)
+
+![Github screenshot](/misc/Github.png)
 
