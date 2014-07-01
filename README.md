@@ -11,6 +11,8 @@ printed some printed lines just goes away.
 
 ![Github screenshot](/misc/Github.png)
 
+npm install phantom blessed
+
 Uses A patched version of phantom js
 ```diff
 diff --git a/src/webpage.cpp b/src/webpage.cpp
