@@ -197,7 +197,8 @@ w.on('inputChar', function (c, i, isKey) {
     }else if(i === nc.keys.F6){
         //MenuBar.window.attrset(nc.colorPair(MenuBarTextColorPair));
         //MenuBar.window.addstr(1, 1, "F6Pressed");
-		ShowUser('');
+        tabs[CurrentTabID].txtinput = 'http';
+		ShowUser(tabs[CurrentTabID].txtinput);
 		//LoadPage("https://news.ycombinator.com/", CurrentTabID);
 		tabs[CurrentTabID].mode = 'textinput';
 		tabs[CurrentTabID].OnEnter = function(Url){
