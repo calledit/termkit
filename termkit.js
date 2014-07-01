@@ -3,6 +3,10 @@ var blessed = require('blessed'),
 
 var screen = blessed.screen();
 
+phantom.stderrHandler = function(stdErr){
+    console.log(stdErr);
+}
+
 screen.key(['escape', 'q', 'C-c'], function(ch, key) {
   return process.exit(0);
 });
@@ -14,6 +18,11 @@ var StyleConfig = {
     InputFocusBgColor: 'red',
     InputHoverBgColor: '#F7A3F1'
 };
+
+var settings = {
+    HomePage: "https://www.facebook.com/"
+};
+
 
 var TopMenu = blessed.box({
     parent: screen,
@@ -39,6 +48,18 @@ var ViewPort = blessed.box({
 
 var Tabs = [];
 
+var phantomProccess = null;
+
+var sysEvents = {
+    OnPhantomLoaded: function(){
+        BrowserActions.newTab(settings.HomePage);
+        //screen.render();
+    }
+};
+phantom.create({binary:"./patched_phantomjs"}, function(phant){
+    phantomProccess = phant;
+    sysEvents.OnPhantomLoaded();
+});
 
 var BrowserActions = {
     newTab: function(url){
@@ -95,15 +116,20 @@ var BrowserActions = {
                 },
             }
         })
+        Tab.BarUrlInput.setValue(url);
+        Tab.BarUrlInput.on('submit', function(){
+            ViewPort.style.bg = '#18aa16';
+            screen.render();
+        });
         
-        Tab.BarForm.focus();
+        Tab.BarUrlInput.focus();
         Tabs.push(Tab);
         Tab._id = Tabs.length - 1;
         return(Tab);
     }
 };
 
-BrowserActions.newTab();
+
 
 screen.render();
 
