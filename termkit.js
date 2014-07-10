@@ -325,8 +325,8 @@ function renderTab(Tab, OnDone){
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
-	//console.log(dumpText)
-        render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
+		console.log(dumpText)
+        var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 	    //console.log(Element)
 	    //return;
             if(Element.ElemType == 'BODY'){
@@ -368,9 +368,27 @@ function TREErender(Tab, OnDone){
                 //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
             }
         });
+		//console.log(dumpText)
+		ShowRenderTree(RenderTree);
+		//dump(RenderTree);
+		process.exit(1);
         OnDone();
     });   
 
+}
+
+function ShowRenderTree(Tree){
+	for(var Num in Tree){
+		var Indent = "";
+		for(var k=0;Tree[Num].Indention>k;k++){
+			Indent += "  ";
+		}
+		console.log(Indent, Tree[Num]._owner, "->", Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where, "->", Tree[Num].childLayer);
+		//console.log(Indent, Tree[Num].What, "at", Tree[Num].Where);
+		if(Tree[Num].Children && Tree[Num].Children.length != 0){
+			ShowRenderTree(Tree[Num].Children);
+		}
+	}
 }
 
 //Renders the page based on info from getClientRects
@@ -585,5 +603,6 @@ function PreDump(S, cache, cacheInfo, road){
 }
 
 function dump(In){
-    console.log(JSON.stringify(PreDump(In), null, 4));
+    console.log(JSON.stringify(In, null, 4));
+    //console.log(JSON.stringify(PreDump(In), null, 4));
 }
