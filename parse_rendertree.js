@@ -202,6 +202,13 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 		//console.log('All: Line:', '_id:', TxtLine._id, 'Type:', TxtLine.Type, 'Owner:', TxtLine._owner)
 		
         if(TxtLine.Indention == Level){
+			var PrevLadd = "root";
+			if(typeof(Owner) != 'undefined' && typeof(Owner.Ladder) != 'undefined'){
+				PrevLadd = Owner.Ladder;
+			}
+			TxtLine.Ladder = PrevLadd+","+TxtLine.ElemType;
+			console.log(TxtLine.Ladder);
+/*
 			if(TxtLine.Type != "layer"){//Is not a layer
 				if(typeof(Owner) == 'undefined'){//Is Root (The root is always a layer so this should not hapen)
 					
@@ -252,6 +259,7 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 				LayerPosSizeIndex[Key].shift();
 				//console.error("Set layer Pos:", TxtLine);
 			}
+*/
 		
 		//var PosTo = GetWhoToPosTo(TxtLine);
         //    	TxtLine.Pos = [TxtLine.RelPos[0] + PosTo[0], TxtLine.RelPos[1] + PosTo[1]];

@@ -319,13 +319,13 @@ function renderTab(Tab, OnDone){
         }
     },function(){});
     TREErender(Tab, OnDone);
-    //JSrender(Tab, OnDone);
+    JSrender(Tab, OnDone);
 }
 
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
-		console.log(dumpText)
+		//console.log(dumpText)
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 	    //console.log(Element)
 	    //return;
@@ -369,10 +369,10 @@ function TREErender(Tab, OnDone){
             }
         });
 		//console.log(dumpText)
-		ShowRenderTree(RenderTree);
+		//ShowRenderTree(RenderTree);
 		//dump(RenderTree);
-		process.exit(1);
-        OnDone();
+		//process.exit(1);
+        //OnDone();
     });   
 
 }
@@ -420,7 +420,7 @@ function JSrender(Tab, OnDone){
             }
             StyleValues.color = Cstyle.color;
           }
-          if(IntrestingBox || Node.nodeType == 3){
+          if(IntrestingBox){//Node.nodeType == 3 We no longer care about Raw text we get that from the Render Tree
             var Rects = [];
             if(IntrestingBox){
                 var Rect = Node.getBoundingClientRect();
@@ -445,7 +445,10 @@ function JSrender(Tab, OnDone){
                 RetObj.text = Node.nodeValue
               }
             }
-          }
+          }else if(Node.nodeType == 3){
+			RetObj.text = true;
+			return(RetObj);
+		  }
           for(var num=0; num < Node.childNodes.length; num++){
             var Chd = allNodes(Node.childNodes.item(num), StyleValues)
             if(Chd){
@@ -464,6 +467,12 @@ function JSrender(Tab, OnDone){
         
         walkJsNodeTree(NodeTree, function(Node, FromOwner){
             //console.log(Node.type, Node.text , Node.backgroundColor, Node.backgroundImage, Node.color, Node.rects);
+			if(typeof(FromOwner.Ladder) == 'undefined'){
+				FromOwner.Ladder = "root";
+			}
+            if(Node.text){
+				console.log("Find Text Node in tree:", FromOwner.Ladder)
+			}
             if(Node.rects){
                 ElPos = [Node.rects[0].left, Node.rects[0].top]
                 ElSize = [Node.rects[0].width, Node.rects[0].height]
@@ -513,6 +522,7 @@ function JSrender(Tab, OnDone){
                     //box.setText(Node.type+"_"+FromOwner.Counter);
                 }
             }
+			FromOwner.Ladder += ","+Node.type
             return(FromOwner);
         });
         OnDone();
