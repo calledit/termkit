@@ -318,7 +318,10 @@ function renderTab(Tab, OnDone){
             }
         }
     },function(){});
-    TREErender(Tab, OnDone);
+    TREErender(Tab, function(RenderTree){
+		Tab.LatestRenderTree = RenderTree;
+		
+	});
     JSrender(Tab, OnDone);
 }
 
@@ -327,6 +330,8 @@ function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
 		//console.log(dumpText)
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
+
+/*
 	    //console.log(Element)
 	    //return;
             if(Element.ElemType == 'BODY'){
@@ -367,12 +372,13 @@ function TREErender(Tab, OnDone){
                 //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
                 //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
             }
+*/
         });
 		//console.log(dumpText)
 		//ShowRenderTree(RenderTree);
 		//dump(RenderTree);
 		//process.exit(1);
-        //OnDone();
+        OnDone(RenderTree);
     });   
 
 }
@@ -406,6 +412,7 @@ function JSrender(Tab, OnDone){
           }
           var IntrestingBox = false;
           if(Node.style){
+            IntrestingBox = true;
             Cstyle =  window.getComputedStyle(Node, null);
             if(Cstyle.backgroundColor != 'rgba(0, 0, 0, 0)'){
               IntrestingBox = true;
@@ -446,7 +453,7 @@ function JSrender(Tab, OnDone){
               }
             }
           }else if(Node.nodeType == 3){
-			RetObj.text = true;
+                RetObj.text = Node.nodeValue
 			return(RetObj);
 		  }
           for(var num=0; num < Node.childNodes.length; num++){
@@ -463,19 +470,74 @@ function JSrender(Tab, OnDone){
 
         return(allNodes(this.document));
     },function(NodeTree){
-        //dump(NodeTree);
+
+        var LayersToFind = {};
+		walkJsNodeTree(Tab.LatestRenderTree, function(TxtLine, FromOwner){
+			if(TxtLine.Type == "layer" && TxtLine._id != 0){//is a layer and not the root layer
+				var FirstRealElement = false;
+				walkJsNodeTree(TxtLine, function(TxElem){
+					if(TxElem.ElemType != 'none'){
+						FirstRealElement = TxElem.ElemType;
+						return false;
+					}
+				});
+				TxtLine.FirstRealElement = FirstRealElement;
+				var key = TxtLine.RelPos.join(',')+"_"+TxtLine.Size.join(',');//+"_"+FirstRealElement;
+				//console.log(key)
+				if(typeof(LayersToFind[key]) == 'undefined'){
+					LayersToFind[key] = [];
+				}
+				LayersToFind[key].push(TxtLine);
+			}
+			return(FromOwner);
+		});
+		
+		//console.log("Find the owners of these layers:")
+		
+		var TrLadderIndex = {};
         
         walkJsNodeTree(NodeTree, function(Node, FromOwner){
             //console.log(Node.type, Node.text , Node.backgroundColor, Node.backgroundImage, Node.color, Node.rects);
 			if(typeof(FromOwner.Ladder) == 'undefined'){
 				FromOwner.Ladder = "root";
 			}
+			FromOwner.Ladder += ","+Node.type
+			Node.Ladder = FromOwner.Ladder;
             if(Node.text){
-				console.log("Find Text Node in tree:", FromOwner.Ladder)
+				console.log("Find Text Node in tree:", Node.Ladder)
+				if(typeof(TrLadderIndex[Node.Ladder]) != 'undefined' && TrLadderIndex[Node.Ladder].length != 0){
+					var FirstText = TrLadderIndex[Node.Ladder].shift()
+					console.log("Found ladder in index:", FirstText)
+				}else{
+					console.log("COuld not find ladder in index")
+				}
+				
 			}
             if(Node.rects){
                 ElPos = [Node.rects[0].left, Node.rects[0].top]
                 ElSize = [Node.rects[0].width, Node.rects[0].height]
+				var key = ElPos.join(',')+"_"+ElSize.join(',');
+				//console.log(key)
+				if(Node.children && Node.children.length != 0){
+					//key += "_"+Node.children[0].type;
+				}
+				if(typeof(LayersToFind[key]) != 'undefined' && LayersToFind[key].length != 0){
+					var FirstLayerOnPos = LayersToFind[key].shift();
+console.log("SeeSee",FirstLayerOnPos.Type)
+					FirstLayerOnPos = FirstLayerOnPos.children[0];
+					
+					var treeBsLen = FirstLayerOnPos.Ladder.length;
+
+					walkJsNodeTree(FirstLayerOnPos, function(RNode, Fr){
+						RNode.Ladder = Node.Ladder + RNode.Ladder.substr(treeBsLen)
+						if(typeof(TrLadderIndex[RNode.Ladder]) == 'undefined'){
+							TrLadderIndex[RNode.Ladder] = [];
+						}
+						TrLadderIndex[RNode.Ladder].push(RNode);
+					});
+					//console.log("Stitched Ladder:", FirstLayerOnPos.Ladder)
+					//console.log("Layer here", Node.Ladder, "layers:", FirstLayerOnPos.Ladder)
+				}
                 var TermPos = terminalConverter.getTerminalPos(ElPos, ElSize);
                 if(TermPos !== false){
 
@@ -522,9 +584,17 @@ function JSrender(Tab, OnDone){
                     //box.setText(Node.type+"_"+FromOwner.Counter);
                 }
             }
-			FromOwner.Ladder += ","+Node.type
             return(FromOwner);
         });
+		//Unfound Layers are that has to to with css magic i guess
+		//dump(LayersToFind);
+		walkJsNodeTree(Tab.LatestRenderTree, function(RNode, Fr){
+			console.log("tr:", RNode.Ladder)
+		});
+		walkJsNodeTree(NodeTree, function(RNode, Fr){
+			console.log("js:", RNode.Ladder)
+		});
+		//process.exit(1);
         OnDone();
     });
 }
@@ -532,7 +602,14 @@ function walkJsNodeTree(NodeTree, callback, FromOwner){
     if(typeof(FromOwner) == 'undefined'){
         var FromOwner = {};
     }
-    FromOwner = callback(NodeTree, clone(FromOwner));
+	if(Array.isArray(NodeTree)){
+		NodeTree = {children: NodeTree};
+	}else{
+		FromOwner = callback(NodeTree, clone(FromOwner));
+		if(FromOwner == false){
+			return(false);
+		}
+	}
     for(var childnum in NodeTree.children){
         walkJsNodeTree(NodeTree.children[childnum], callback, FromOwner);
     }

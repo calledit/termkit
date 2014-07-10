@@ -207,7 +207,7 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 				PrevLadd = Owner.Ladder;
 			}
 			TxtLine.Ladder = PrevLadd+","+TxtLine.ElemType;
-			console.log(TxtLine.Ladder);
+			//console.log(TxtLine.Ladder);
 /*
 			if(TxtLine.Type != "layer"){//Is not a layer
 				if(typeof(Owner) == 'undefined'){//Is Root (The root is always a layer so this should not hapen)
@@ -311,7 +311,7 @@ function GetLevel(Level, PharseLevels, Owner, callback){
         }else if(TxtLine.Indention > Level){
             PharseLevels.unshift(TxtLine);
 	    //console.log("NewLevel:",Level,Stuff[Stuff.length-1])
-            Stuff[Stuff.length-1].Children = GetLevel(TxtLine.Indention, PharseLevels, Stuff[Stuff.length-1], callback);
+            Stuff[Stuff.length-1].children = GetLevel(TxtLine.Indention, PharseLevels, Stuff[Stuff.length-1], callback);
 	    //console.log("EndLevel:",Level,Stuff[Stuff.length-1])
         }else{
             PharseLevels.unshift(TxtLine);
