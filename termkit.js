@@ -325,7 +325,10 @@ function renderTab(Tab, OnDone){
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
+	//console.log(dumpText)
         render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
+	    //console.log(Element)
+	    //return;
             if(Element.ElemType == 'BODY'){
                 Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
             }
@@ -362,7 +365,7 @@ function TREErender(Tab, OnDone){
                 box.setText(Element.Text);
                 //box.setText(StrObj(Element.Where));
                 //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
-                //console.log('Text', Element);
+                //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
             }
         });
         OnDone();
