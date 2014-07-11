@@ -319,7 +319,11 @@ function renderTab(Tab, OnDone){
         }
     },function(){});
 
-    TREErender(Tab, OnDone)
+	JSdomInfo(Tab, function(jsLadderIndex){
+		Tab.jsLadderIndex = jsLadderIndex;
+		TREErender(Tab, OnDone);
+		
+	});
 /*
     TREErender(Tab, function(RenderTree){
 		Tab.LatestRenderTree = RenderTree;
@@ -337,8 +341,22 @@ function TREErender(Tab, OnDone){
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
 
-	    //console.log(Element)
-	    //return;
+			if(typeof(Element.Ladder) != 'undefined' && typeof(Tab.jsLadderIndex[Element.Ladder]) != 'undefined' && Tab.jsLadderIndex[Element.Ladder].length != 0){
+				Element.DomNode = Tab.jsLadderIndex[Element.Ladder].shift();
+			}else{
+				
+				//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
+			}
+			
+			if(typeof(Element.DomNode) != 'undefined'){
+				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
+					Element.Attrs.bgcolor = Element.DomNode.StyleObj.bg;
+					Element.BgColor = true;
+				}
+				if(typeof(Element.DomNode.StyleObj.fg) != 'undefined'){
+					Element.Attrs.color = Element.DomNode.StyleObj.fg;
+				}
+			}
             if(Element.ElemType == 'BODY'){
                 Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
             }
@@ -357,6 +375,8 @@ function TREErender(Tab, OnDone){
                                 'fg': Element.Attrs.color
                             }
                         });
+						//box.setText(Element.Attrs.bgcolor+"");
+						//box.setText(Element.Text);
                         //box.setText(Element.Type+"_"+StrObj(Element.Pos)+"_"+StrObj(Element.Size)+"_"+StrObj(TermPos));
                     }
                 }
@@ -402,8 +422,10 @@ function ShowRenderTree(Tree){
 	}
 }
 
-//Renders the page based on info from getClientRects
-function JSrender(Tab, OnDone){
+//gets element info from the dom
+function JSdomInfo(Tab, OnDone){
+	
+	var jsLadderIndex = {};
     Tab.PhantomTab.evaluate(function() {
         function allNodes(Node, StyleValuesOrg){
           var RetObj = {type: Node.nodeName, children: []};
@@ -428,24 +450,11 @@ function JSrender(Tab, OnDone){
               BgImage = Cstyle.backgroundImage;
             }
             if(Cstyle.backgroundColor == 'rgba(0, 0, 0, 0)' && BgImage){
-              delete StyleValues.backgroundColor;
+              //delete StyleValues.backgroundColor;
             }
             StyleValues.color = Cstyle.color;
           }
-          if(IntrestingBox){//Node.nodeType == 3 We no longer care about Raw text we get that from the Render Tree
-            var Rects = [];
-            if(IntrestingBox){
-                var Rect = Node.getBoundingClientRect();
-                if(Rect && !(Rect.left == 0 && Rect.top == 0 && Rect.right == 0 && Rect.bottom == 0)){
-                    Rects = [Rect]
-                }
-            }else{
-                var range = document.createRange();
-                range.selectNode(Node)
-                Rects = range.getClientRects();
-            }
-            if(Rects.length > 0){
-              RetObj.rects = Rects;
+          if(IntrestingBox){
               RetObj.color = StyleValues.color;
               if(StyleValues.backgroundColor){
                 RetObj.backgroundColor = StyleValues.backgroundColor;
@@ -453,13 +462,6 @@ function JSrender(Tab, OnDone){
               if(BgImage){
                 RetObj.backgroundImage = BgImage;
               }
-              if(Node.nodeType == 3){
-                RetObj.text = Node.nodeValue
-              }
-            }
-          }else if(Node.nodeType == 3){
-                RetObj.text = Node.nodeValue
-			return(RetObj);
 		  }
           for(var num=0; num < Node.childNodes.length; num++){
             var Chd = allNodes(Node.childNodes.item(num), StyleValues)
@@ -467,142 +469,51 @@ function JSrender(Tab, OnDone){
               RetObj.children.push(Chd);
             }
           }
-          if(!RetObj.rects && RetObj.children.length == 0){
-            return(false);
-          }
           return(RetObj);
         }
 
         return(allNodes(this.document));
     },function(NodeTree){
 
-        var LayersToFind = {};
-		walkJsNodeTree(Tab.LatestRenderTree, function(TxtLine, FromOwner){
-			if(TxtLine.Type == "layer" && TxtLine._id != 0){//is a layer and not the root layer
-				var FirstRealElement = false;
-				walkJsNodeTree(TxtLine, function(TxElem){
-					if(TxElem.ElemType != 'none'){
-						FirstRealElement = TxElem.ElemType;
-						return false;
-					}
-				});
-				TxtLine.FirstRealElement = FirstRealElement;
-				var key = TxtLine.RelPos.join(',')+"_"+TxtLine.Size.join(',');//+"_"+FirstRealElement;
-				//console.log(key)
-				if(typeof(LayersToFind[key]) == 'undefined'){
-					LayersToFind[key] = [];
-				}
-				LayersToFind[key].push(TxtLine);
-			}
-			return(FromOwner);
-		});
 		
-		//console.log("Find the owners of these layers:")
-		
-		var TrLadderIndex = {};
         
         walkJsNodeTree(NodeTree, function(Node, FromOwner){
             //console.log(Node.type, Node.text , Node.backgroundColor, Node.backgroundImage, Node.color, Node.rects);
 			if(typeof(FromOwner.Ladder) == 'undefined'){
 				FromOwner.Ladder = "root";
 			}
-			FromOwner.Ladder += ","+Node.type
-			Node.Ladder = FromOwner.Ladder;
-            if(Node.text){
-				console.log("Find Text Node in tree:", Node.Ladder)
-				if(typeof(TrLadderIndex[Node.Ladder]) != 'undefined' && TrLadderIndex[Node.Ladder].length != 0){
-					var FirstText = TrLadderIndex[Node.Ladder].shift()
-					console.log("Found ladder in index:", FirstText)
-				}else{
-					console.log("COuld not find ladder in index")
-				}
-				
+			if(FromOwner.Ladder == "root" && Node.type == "#document"){
+			}else{
+				FromOwner.Ladder += ","+Node.type
 			}
-            if(Node.rects){
-                ElPos = [Node.rects[0].left, Node.rects[0].top]
-                ElSize = [Node.rects[0].width, Node.rects[0].height]
-				var key = ElPos.join(',')+"_"+ElSize.join(',');
-				//console.log(key)
-				if(Node.children && Node.children.length != 0){
-					//key += "_"+Node.children[0].type;
+			Node.Ladder = FromOwner.Ladder;
+			if(typeof(jsLadderIndex[Node.Ladder]) == 'undefined'){
+				jsLadderIndex[Node.Ladder] = [];
+			}
+			jsLadderIndex[Node.Ladder].push(Node);
+            Node.StyleObj = {};
+			if(typeof(FromOwner.Counter) == 'undefined'){
+				FromOwner.Counter = 0;
+			}else{
+				FromOwner.Counter++;
+			}
+			
+			if(Node.backgroundImage){//Somehow i need to convert to image to a usable format
+				//For now letts just hope the image is some kind of
+				//filter like a gradient that contains a rgb value if
+				//not we ignore the image
+				var RgVal = GetRGB(Node.backgroundImage, 'rgb');
+				//console.log(Node.backgroundImage, RgVal)
+				if(RgVal){
+					Node.StyleObj.bg = RgVal;
 				}
-				if(typeof(LayersToFind[key]) != 'undefined' && LayersToFind[key].length != 0){
-					var FirstLayerOnPos = LayersToFind[key].shift();
-console.log("SeeSee",FirstLayerOnPos.Type)
-					FirstLayerOnPos = FirstLayerOnPos.children[0];
-					
-					var treeBsLen = FirstLayerOnPos.Ladder.length;
-
-					walkJsNodeTree(FirstLayerOnPos, function(RNode, Fr){
-						RNode.Ladder = Node.Ladder + RNode.Ladder.substr(treeBsLen)
-						if(typeof(TrLadderIndex[RNode.Ladder]) == 'undefined'){
-							TrLadderIndex[RNode.Ladder] = [];
-						}
-						TrLadderIndex[RNode.Ladder].push(RNode);
-					});
-					//console.log("Stitched Ladder:", FirstLayerOnPos.Ladder)
-					//console.log("Layer here", Node.Ladder, "layers:", FirstLayerOnPos.Ladder)
-				}
-                var TermPos = terminalConverter.getTerminalPos(ElPos, ElSize);
-                if(TermPos !== false){
-
-                    var StyleObj = {};
-                    if(Node.backgroundColor){
-                        StyleObj.bg = GetRGB(Node.backgroundColor);
-                    }else if(FromOwner.LastBgColor){//If the ower has an image has background we wont get anything so we just use the last color we saw
-                        StyleObj.bg = FromOwner.LastBgColor;
-                    }
-                    if(typeof(FromOwner.Counter) == 'undefined'){
-                        FromOwner.Counter = 0;
-                    }else{
-                        FromOwner.Counter++;
-                    }
-                    
-                    if(Node.backgroundImage){//Somehow i need to convert to image to a usable format
-                        //For now letts just hope the image is some kind of
-                        //filter like a gradient that contains a rgb value if
-                        //not we ignore the image
-                        var RgVal = GetRGB(Node.backgroundImage, 'rgb');
-                        if(RgVal){
-                            StyleObj.bg = RgVal;
-                        }
-                        
-                    }
-                    if(Node.color){
-                        StyleObj.fg = GetRGB(Node.color);
-                    }
-                    if(StyleObj.bg){
-                        FromOwner.LastBgColor = StyleObj.bg;
-                    }
-                    box = blessed.box({
-                        parent: Tab.ViewPort,
-                        left: TermPos.left,
-                        top: TermPos.top,
-                        width: TermPos.width,
-                        height: TermPos.height,
-                        style: StyleObj
-                    });
-                    if(Node.text){
-                        box.setText(Node.text);
-                    }
-                    //box.setText(StrObj(FromOwner.LastBgColor));
-                    //box.setText(Node.type+"_"+FromOwner.Counter);
-                }
-            }
+			}
             return(FromOwner);
         });
-		//Unfound Layers are that has to to with css magic i guess
-		//dump(LayersToFind);
-		walkJsNodeTree(Tab.LatestRenderTree, function(RNode, Fr){
-			console.log("tr:", RNode.Ladder)
-		});
-		walkJsNodeTree(NodeTree, function(RNode, Fr){
-			console.log("js:", RNode.Ladder)
-		});
-		//process.exit(1);
-        OnDone();
+        OnDone(jsLadderIndex);
     });
 }
+
 function walkJsNodeTree(NodeTree, callback, FromOwner){
     if(typeof(FromOwner) == 'undefined'){
         var FromOwner = {};
@@ -625,7 +536,7 @@ function GetRGB(ColorText, type){
         type = '';
     }
     Pars = ColorText.split(type+'(');
-    if(Pars.length != 2){
+    if(Pars.length < 2){
         return(false);
     }
     ColorParts = Pars[1].split(')')[0];
@@ -633,6 +544,9 @@ function GetRGB(ColorText, type){
     if(value[3] == 0){
         return(false);
     }
+	for(var x in value){
+		value[x] = parseInt(value[x]);
+	}
     return(value);
 I}
 

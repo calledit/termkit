@@ -91,15 +91,6 @@ module.exports = function(focusedFrameRenderTreeDump, DefaultOwnerVal, callback)
                         }
                         LocationInfo[0] = LocationInfo[0].substr(1, LocationInfo[0].length-2).split(',')
                         Thing.RelPos = [parseInt(LocationInfo[0][0]), parseInt(LocationInfo[0][1])];
-						if(Thing.Type == "layer" && Thing.Indention != 0){//is a layer and not the renderview layer
-							var Key = Thing.RelPos.join(",")+"_"+Thing.Size.join(",");
-							if(typeof(LayerPosSizeIndex[Key]) == 'undefined'){
-								LayerPosSizeIndex[Key] = [];
-								//console.error("two layers on the same spot", LayerPosSizeIndex[Key], Thing);
-								//return;
-							}
-							LayerPosSizeIndex[Key].push(Thing);
-						}
 						Thing._id = IdCounter++;
                         PharseLevels.push(Thing);
                         ElementIndex[Thing._id] = Thing;
@@ -206,8 +197,10 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 			if(typeof(Owner) != 'undefined' && typeof(Owner.Ladder) != 'undefined'){
 				PrevLadd = Owner.Ladder;
 			}
-			TxtLine.Ladder = PrevLadd+","+TxtLine.ElemType;
-			//console.log(TxtLine.Ladder);
+			if(PrevLadd == "root" && TxtLine.ElemType == "none"){
+			}else{
+				TxtLine.Ladder = PrevLadd+","+TxtLine.ElemType;
+			}
 
 			if(TxtLine.Type != "layer"){//Is not a layer
 				if(typeof(Owner) == 'undefined'){//Is Root (The root is always a layer so this should not hapen)
