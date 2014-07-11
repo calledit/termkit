@@ -318,20 +318,25 @@ function renderTab(Tab, OnDone){
             }
         }
     },function(){});
+
+    TREErender(Tab, OnDone)
+/*
     TREErender(Tab, function(RenderTree){
 		Tab.LatestRenderTree = RenderTree;
 		
 	});
-    JSrender(Tab, OnDone);
+*/
+    //JSrender(Tab, OnDone);
 }
 
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
 		//console.log(dumpText)
+		//process.exit(1);
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
-/*
+
 	    //console.log(Element)
 	    //return;
             if(Element.ElemType == 'BODY'){
@@ -372,7 +377,7 @@ function TREErender(Tab, OnDone){
                 //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
                 //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
             }
-*/
+
         });
 		//console.log(dumpText)
 		//ShowRenderTree(RenderTree);
@@ -391,8 +396,8 @@ function ShowRenderTree(Tree){
 		}
 		console.log(Indent, Tree[Num]._owner, "->", Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where, "->", Tree[Num].childLayer);
 		//console.log(Indent, Tree[Num].What, "at", Tree[Num].Where);
-		if(Tree[Num].Children && Tree[Num].Children.length != 0){
-			ShowRenderTree(Tree[Num].Children);
+		if(Tree[Num].children && Tree[Num].children.length != 0){
+			ShowRenderTree(Tree[Num].children);
 		}
 	}
 }

@@ -1,15 +1,97 @@
-From 1b328e31347621d33f33a0d7f01bfe63de4f99df Mon Sep 17 00:00:00 2001
-From: callesg <calle@sagulin.se>
-Date: Wed, 9 Jul 2014 19:45:59 +0200
-Subject: [PATCH 1/2] Simple render tree add
-
----
- src/webpage.cpp | 5 +++++
- src/webpage.h   | 7 +++++++
- 2 files changed, 12 insertions(+)
-
+diff --git a/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp b/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
+index 9709838..0c2ac67 100644
+--- a/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
++++ b/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
+@@ -244,35 +244,7 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o,
+         }
+     }
+ 
+-    bool adjustForTableCells = o.containingBlock()->isTableCell();
+-
+-    IntRect r;
+-    if (o.isText()) {
+-        // FIXME: Would be better to dump the bounding box x and y rather than the first run's x and y, but that would involve updating
+-        // many test results.
+-        const RenderText& text = *toRenderText(&o);
+-        IntRect linesBox = text.linesBoundingBox();
+-        r = IntRect(text.firstRunX(), text.firstRunY(), linesBox.width(), linesBox.height());
+-        if (adjustForTableCells && !text.firstTextBox())
+-            adjustForTableCells = false;
+-    } else if (o.isRenderInline()) {
+-        // FIXME: Would be better not to just dump 0, 0 as the x and y here.
+-        const RenderInline& inlineFlow = *toRenderInline(&o);
+-        r = IntRect(0, 0, inlineFlow.linesBoundingBox().width(), inlineFlow.linesBoundingBox().height());
+-        adjustForTableCells = false;
+-    } else if (o.isTableCell()) {
+-        // FIXME: Deliberately dump the "inner" box of table cells, since that is what current results reflect.  We'd like
+-        // to clean up the results to dump both the outer box and the intrinsic padding so that both bits of information are
+-        // captured by the results.
+-        const RenderTableCell& cell = *toRenderTableCell(&o);
+-        r = IntRect(cell.x(), cell.y() + cell.intrinsicPaddingBefore(), cell.width(), cell.height() - cell.intrinsicPaddingBefore() - cell.intrinsicPaddingAfter());
+-    } else if (o.isBox())
+-        r = toRenderBox(&o)->frameRect();
+-
+-    // FIXME: Temporary in order to ensure compatibility with existing layout test results.
+-    if (adjustForTableCells)
+-        r.move(0, -toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore());
+-
++    IntRect r = const_cast<RenderObject&>(o).absoluteClippedOverflowRect();
+     ts << " " << r;
+ 
+     if (!(o.isText() && !o.isBR())) {
+@@ -566,8 +538,6 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
+     }
+ 
+     for (RenderObject* child = o.firstChild(); child; child = child->nextSibling()) {
+-        if (child->hasLayer())
+-            continue;
+         write(ts, *child, indent + 1, behavior);
+     }
+ 
+@@ -671,41 +641,9 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
+     if (shouldPaint && paintsBackgroundSeparately)
+         write(ts, *l, layerBounds, damageRect, clipRectToApply, outlineRect, LayerPaintPhaseBackground, indent, behavior);
+ 
+-    if (negList) {
+-        int currIndent = indent;
+-        if (behavior & RenderAsTextShowLayerNesting) {
+-            writeIndent(ts, indent);
+-            ts << " negative z-order list(" << negList->size() << ")\n";
+-            ++currIndent;
+-        }
+-        for (unsigned i = 0; i != negList->size(); ++i)
+-            writeLayers(ts, rootLayer, negList->at(i), paintDirtyRect, currIndent, behavior);
+-    }
+-
+     if (shouldPaint)
+         write(ts, *l, layerBounds, damageRect, clipRectToApply, outlineRect, paintsBackgroundSeparately ? LayerPaintPhaseForeground : LayerPaintPhaseAll, indent, behavior);
+ 
+-    if (Vector<RenderLayer*>* normalFlowList = l->normalFlowList()) {
+-        int currIndent = indent;
+-        if (behavior & RenderAsTextShowLayerNesting) {
+-            writeIndent(ts, indent);
+-            ts << " normal flow list(" << normalFlowList->size() << ")\n";
+-            ++currIndent;
+-        }
+-        for (unsigned i = 0; i != normalFlowList->size(); ++i)
+-            writeLayers(ts, rootLayer, normalFlowList->at(i), paintDirtyRect, currIndent, behavior);
+-    }
+-
+-    if (Vector<RenderLayer*>* posList = l->posZOrderList()) {
+-        int currIndent = indent;
+-        if (behavior & RenderAsTextShowLayerNesting) {
+-            writeIndent(ts, indent);
+-            ts << " positive z-order list(" << posList->size() << ")\n";
+-            ++currIndent;
+-        }
+-        for (unsigned i = 0; i != posList->size(); ++i)
+-            writeLayers(ts, rootLayer, posList->at(i), paintDirtyRect, currIndent, behavior);
+-    }
+ }
+ 
+ static String nodePosition(Node* node)
 diff --git a/src/webpage.cpp b/src/webpage.cpp
-index 5dde3c6..f2ebc9f 100644
+index 5dde3c6..1bf7d52 100644
 --- a/src/webpage.cpp
 +++ b/src/webpage.cpp
 @@ -1616,6 +1616,11 @@ QString WebPage::focusedFrameName() const
@@ -18,69 +100,35 @@ index 5dde3c6..f2ebc9f 100644
  
 +QString WebPage::focusedFrameRenderTreeDump() const
 +{
-+    return m_customWebPage->currentFrame()->renderTreeDump();
++	return m_customWebPage->currentFrame()->renderTreeDump();
 +}
 +
  static void injectCallbacksObjIntoFrame(QWebFrame *frame, WebpageCallbacks *callbacksObject)
  {
      // Inject object only if it's not already present
 diff --git a/src/webpage.h b/src/webpage.h
-index df2b83a..b2391a2 100644
+index df2b83a..3ea7ace 100644
 --- a/src/webpage.h
 +++ b/src/webpage.h
 @@ -79,6 +79,7 @@ class WebPage : public QObject, public QWebFrame::PrintCallback
      Q_PROPERTY(QString frameName READ frameName)
      Q_PROPERTY(int framesCount READ framesCount)
      Q_PROPERTY(QString focusedFrameName READ focusedFrameName)
-+    Q_PROPERTY(QString focusedFrameRenderTreeDump READ focusedFrameRenderTreeDump)
++	Q_PROPERTY(QString focusedFrameRenderTreeDump READ focusedFrameRenderTreeDump)
  
  public:
      WebPage(QObject *parent, const QUrl &baseUrl = QUrl());
-@@ -233,6 +234,12 @@ public:
+@@ -233,6 +234,13 @@ public:
       * @return Frame
       */
      QString focusedFrameName() const;
-+    /**
-+     *  Returns the currently focused Frame's render tree
-+     * @brief focusedFrameName
-+     * @return DUmp of frame render tree
-+     */
-+    QString focusedFrameRenderTreeDump() const;
++	/**
++	* Returns the currently focused Frame's render tree
++	*
++	* @brief textual dump of the reder tree
++	* @return DUmp of frame render tree
++	*/
++	QString focusedFrameRenderTreeDump() const;
  
  public slots:
      void openUrl(const QString &address, const QVariant &op, const QVariantMap &settings);
--- 
-1.8.3.4 (Apple Git-47)
-
-
-From 9d62b6776cfb188e75b0f36130a84bd07f645da7 Mon Sep 17 00:00:00 2001
-From: callesg <calle@sagulin.se>
-Date: Thu, 10 Jul 2014 02:56:56 +0200
-Subject: [PATCH 2/2] bonker
-
----
- src/qt/src/3rdparty/webkit/Source/WebKit/qt/Api/qwebframe.cpp | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/src/qt/src/3rdparty/webkit/Source/WebKit/qt/Api/qwebframe.cpp b/src/qt/src/3rdparty/webkit/Source/WebKit/qt/Api/qwebframe.cpp
-index 04453b6..6e2a3b3 100644
---- a/src/qt/src/3rdparty/webkit/Source/WebKit/qt/Api/qwebframe.cpp
-+++ b/src/qt/src/3rdparty/webkit/Source/WebKit/qt/Api/qwebframe.cpp
-@@ -686,8 +686,13 @@ QString QWebFrame::renderTreeDump() const
- {
-     if (d->frame->view() && d->frame->view()->layoutPending())
-         d->frame->view()->layout();
-+    // Dump all layers, not just those that would paint.
-+    // Annotate the layer lists.
-+    // Show which layers are composited.
-+    // Show layer and renderer addresses.
-+    // Show id and class attributes
- 
--    return externalRepresentation(d->frame);
-+    return externalRepresentation(d->frame, 1 << 0|1 << 1|1 << 2|1 << 3|1 << 4);
- }
- 
- /*!
--- 
-1.8.3.4 (Apple Git-47)
-

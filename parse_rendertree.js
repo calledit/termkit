@@ -208,7 +208,7 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 			}
 			TxtLine.Ladder = PrevLadd+","+TxtLine.ElemType;
 			//console.log(TxtLine.Ladder);
-/*
+
 			if(TxtLine.Type != "layer"){//Is not a layer
 				if(typeof(Owner) == 'undefined'){//Is Root (The root is always a layer so this should not hapen)
 					
@@ -216,20 +216,21 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 					TxtLine._owner = Owner._id;
 				}
 				if(TxtLine._owner == -1){//Is Not Root
-					console.error("Renderer Has no owner", TxtLine._id);
+					//console.error("Renderer Has no owner", TxtLine._id);
 					//return;
 				}
 				//console.log('Elements: Line:', '_id:', TxtLine._id, 'Type:', TxtLine.Type, 'Owner:', TxtLine._owner)
 				//console.log(TxtLine._owner)
-				var PosRelTo = [ElementIndex[TxtLine._owner].Pos[0], ElementIndex[TxtLine._owner].Pos[1]];
-				if(TxtLine.PosType == "floating"){//Floating elements postion does not base in the layer it is in
-					var LayerElementIsIn = getElementLayer(TxtLine);
+				//var PosRelTo = [ElementIndex[TxtLine._owner].Pos[0], ElementIndex[TxtLine._owner].Pos[1]];
+				//if(TxtLine.PosType == "floating"){//Floating elements postion does not base in the layer it is in
+				//	var LayerElementIsIn = getElementLayer(TxtLine);
 					//console.log("Float",TxtLine._id," is in layer",LayerElementIsIn._id,"LayerPos", LayerElementIsIn.Pos, "Owner", PosRelTo)
 					//PosRelTo[0] -= LayerElementIsIn.Pos[0];
 					//PosRelTo[1] -= LayerElementIsIn.Pos[1];
 					//console.log("Change","LayerPos", LayerElementIsIn.Pos, "PosRelTo", PosRelTo)
-				}
-            	TxtLine.Pos = [TxtLine.RelPos[0] + PosRelTo[0], TxtLine.RelPos[1] + PosRelTo[1]];
+				//}
+            	//TxtLine.Pos = [TxtLine.RelPos[0], TxtLine.RelPos[1]];
+/*
 				if(typeof(TxtLine.Size) != 'undefined'){//Only Elements that has size can own layers
 					var Key = TxtLine.Pos.join(",")+"_"+TxtLine.Size.join(",");
 					if(typeof(LayerPosSizeIndex[Key]) != 'undefined' && LayerPosSizeIndex[Key].length != 0){
@@ -247,19 +248,26 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 						//return;
 					}
 				}
+*/
 			}else{//Is a layer
 				if(TxtLine._owner == -1){
 					//TxtLine._owner = Owner._id;
-					console.error("Layer Has Not been assigned potential owner", TxtLine._id);
+					//console.error("Layer Has Not been assigned potential owner", TxtLine._id);
 				}
-				TxtLine.Pos = TxtLine.RelPos;//Layers are exactly positioned
+				//TxtLine.Pos = TxtLine.RelPos;//Layers are exactly positioned
 				
 				//Remove Ourself from the layer list
-				var Key = TxtLine.Pos.join(",")+"_"+TxtLine.Size.join(",");
-				LayerPosSizeIndex[Key].shift();
+				//var Key = TxtLine.Pos.join(",")+"_"+TxtLine.Size.join(",");
+				//LayerPosSizeIndex[Key].shift();
 				//console.error("Set layer Pos:", TxtLine);
 			}
-*/
+			if(TxtLine.Text){
+				var PosRelTo = [ElementIndex[TxtLine._owner].Pos[0], ElementIndex[TxtLine._owner].Pos[1]];
+				TxtLine.Pos = [TxtLine.RelPos[0] + PosRelTo[0], TxtLine.RelPos[1] + PosRelTo[1]];
+			}else{
+				TxtLine.Pos = [TxtLine.RelPos[0], TxtLine.RelPos[1]];
+			}
+
 		
 		//var PosTo = GetWhoToPosTo(TxtLine);
         //    	TxtLine.Pos = [TxtLine.RelPos[0] + PosTo[0], TxtLine.RelPos[1] + PosTo[1]];
@@ -269,44 +277,47 @@ function GetLevel(Level, PharseLevels, Owner, callback){
             		TxtLine.Pos = [TxtLine.RelPos[0] + Owner.BlockPos[0], TxtLine.RelPos[1] + Owner.BlockPos[1]];
 		}*/
 
-/*
-            if(typeof(TxtLine.Attrs.color) == 'undefined'){
-                TxtLine.Attrs.color = Owner.Attrs.color;
-            }
-            if(typeof(TxtLine.Size) == 'undefined'){
-                TxtLine.Size = Owner.Size;
-            }
-            if("BODY" ==  TxtLine.ElemType){
-                if(typeof(TxtLine.Attrs.bgcolor) != 'undefined'){
-                    DefaultOwnerValues.bgcolor = TxtLine.Attrs.bgcolor;
-                    Owner.Attrs.bgcolor = DefaultOwnerValues.bgcolor;
-                }
-                if(typeof(TxtLine.Attrs.color) != 'undefined'){
-                    DefaultOwnerValues.color = TxtLine.Attrs.color;
-                    Owner.Attrs.color = DefaultOwnerValues.color;
-                }
-            }
-*/
+
+			if(typeof(Owner) != 'undefined' && typeof(Owner.Attrs) != 'undefined'){
+				if(typeof(TxtLine.Attrs.color) == 'undefined'){
+					TxtLine.Attrs.color = Owner.Attrs.color;
+				}
+				//if(typeof(TxtLine.Attrs.bgcolor) == 'undefined'){
+					//TxtLine.Attrs.bgcolor = Owner.Attrs.bgcolor;
+				//}
+				if(typeof(TxtLine.Size) == 'undefined'){
+					TxtLine.Size = Owner.Size;
+				}
+			}
+			if("BODY" ==  TxtLine.ElemType){
+				if(typeof(TxtLine.Attrs.bgcolor) != 'undefined'){
+					DefaultOwnerValues.bgcolor = TxtLine.Attrs.bgcolor;
+					Owner.Attrs.bgcolor = DefaultOwnerValues.bgcolor;
+				}
+				if(typeof(TxtLine.Attrs.color) != 'undefined'){
+					DefaultOwnerValues.color = TxtLine.Attrs.color;
+					Owner.Attrs.color = DefaultOwnerValues.color;
+				}
+			}
+
             /*if(positionIrelevantElements.indexOf(TxtLine.Type) == -1){
                 TxtLine.BlockPos = TxtLine.Pos;
             }else{
                 TxtLine.BlockPos = Owner.BlockPos;
             }*/
-/*
+
             if(typeof(TxtLine.Attrs.bgcolor) == 'undefined'){
                 TxtLine.BgColor = false;
-                TxtLine.Attrs.bgcolor = Owner.Attrs.bgcolor;
+				if(typeof(Owner) != 'undefined' && typeof(Owner.Attrs) != 'undefined'){
+					TxtLine.Attrs.bgcolor = Owner.Attrs.bgcolor;
+				}
             }else{
-                //if(TxtLine.PosType !== 'anonymous'){
-                    TxtLine.BgColor = true;
-                //}else{
-                    //TxtLine.BgColor = false;
-                //}
+                TxtLine.BgColor = true;
             }
-*/
+
             //delete TxtLine.RelPos;
             //delete TxtLine.Where;
-            //callback(TxtLine, DefaultOwnerValues);
+            callback(TxtLine, DefaultOwnerValues);
             Stuff.push(TxtLine);
         }else if(TxtLine.Indention > Level){
             PharseLevels.unshift(TxtLine);
