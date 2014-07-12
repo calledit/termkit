@@ -22,8 +22,8 @@ var StyleConfig = {
 };
 
 var settings = {
-    HomePage: "https://www.facebook.com/"
-    //HomePage: "https://news.ycombinator.com/"
+    //HomePage: "https://www.facebook.com/"
+    HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -361,7 +361,7 @@ function TREErender(Tab, OnDone){
                 Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
             }
             if(typeof(Element.Text) == "undefined"){
-                if(Element.BgColor){
+                if(Element.BgColor || true){
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size);
                     if(TermPos !== false){
                         box = blessed.box({
@@ -369,7 +369,10 @@ function TREErender(Tab, OnDone){
                             left: TermPos.left,
                             top: TermPos.top,
                             width: TermPos.width,
+                            //width: Math.min(40,TermPos.width),
                             height: TermPos.height,
+                            //height: Math.min(4,TermPos.height),
+							content: Element._id+"="+Element.ElemType+":"+Element.Size.join('x'),
                             style: {
                                 'bg': Element.Attrs.bgcolor,
                                 'fg': Element.Attrs.color
@@ -378,21 +381,26 @@ function TREErender(Tab, OnDone){
 						//box.setText(Element.Attrs.bgcolor+"");
 						//box.setText(Element.Text);
                         //box.setText(Element.Type+"_"+StrObj(Element.Pos)+"_"+StrObj(Element.Size)+"_"+StrObj(TermPos));
-                    }
-                }
+                    }else{
+						console.log("Size Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+					}
+				}else{
+					console.log("Visi Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+				}
             }else{
                 box = blessed.box({
-                    parent: Tab.ViewPort,
+                    //parent: Tab.ViewPort,
                     left: terminalConverter.getTerminalX(Element.Pos[0]),
                     top: terminalConverter.getTerminalY(Element.Pos[1]),
                     width: Element.Text.length,
                     height: 1,
+					content: Element.Text,
                     style: {
                         'bg': Element.Attrs.bgcolor,
                         'fg': Element.Attrs.color
                     }
                 });
-                box.setText(Element.Text);
+                //box.setText(Element.Text);
                 //box.setText(StrObj(Element.Where));
                 //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
                 //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
@@ -402,6 +410,7 @@ function TREErender(Tab, OnDone){
 		//console.log(dumpText)
 		//ShowRenderTree(RenderTree);
 		//dump(RenderTree);
+		dbgclear();
 		//process.exit(1);
         OnDone(RenderTree);
     });   
@@ -611,4 +620,9 @@ function PreDump(S, cache, cacheInfo, road){
 function dump(In){
     console.log(JSON.stringify(In, null, 4));
     //console.log(JSON.stringify(PreDump(In), null, 4));
+}
+function dbgclear(){
+	for(var k=0;screen.height*2>k;k++){
+		console.log("Break");
+	}
 }
