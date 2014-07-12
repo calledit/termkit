@@ -22,7 +22,8 @@ var StyleConfig = {
 };
 
 var settings = {
-    HomePage: "https://www.facebook.com/"
+    HomePage: "https://www.youtube.com/"
+    //HomePage: "https://www.facebook.com/"
     //HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
@@ -404,6 +405,14 @@ function TREErender(Tab, OnDone){
 				//console.log("Addding as child")
 			}
 			
+			var SpecialType = false;
+			
+			if(Element.Type == "RenderImage"){
+				Element.BgColor = true;
+				SpecialType = 'IMG';
+				BlessStyle.bg = "#7f7f7f";
+			}
+			
             if(typeof(Element.Text) == "undefined"){
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
                 if(Element.BgColor && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
@@ -412,7 +421,7 @@ function TREErender(Tab, OnDone){
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
                     if(TermPos !== false){
 						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
-						Element.blessBox = blessed.box({
+						var BlesSettings = {
                             parent: BlessOwner,
                             left: TermPos.left,
                             top: TermPos.top,
@@ -420,7 +429,13 @@ function TREErender(Tab, OnDone){
                             height: TermPos.height,
 							//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
                             style: BlessStyle
-                        });
+                        };
+						if(SpecialType != false){
+							BlesSettings.content = SpecialType;
+							BlesSettings.valign = 'middle';
+							BlesSettings.align = 'center';
+						}
+						Element.blessBox = blessed.box(BlesSettings);
                     }else{
 						//console.log("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 					}
@@ -442,8 +457,8 @@ function TREErender(Tab, OnDone){
 
         });
 		//console.log(dumpText)
-		//ShowRenderTree(RenderTree);
 		//dump(RenderTree);
+		//ShowRenderTree(RenderTree);
 		//dbgclear();
 		//process.exit(1);
         OnDone(RenderTree);
