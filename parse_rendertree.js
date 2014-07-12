@@ -198,9 +198,6 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 
             if(typeof(TxtLine.Attrs.bgcolor) == 'undefined'){
                 TxtLine.BgColor = false;
-				if(typeof(Owner) != 'undefined' && typeof(Owner.Attrs) != 'undefined'){
-					TxtLine.Attrs.bgcolor = Owner.Attrs.bgcolor;
-				}
             }else{
                 TxtLine.BgColor = true;
             }

@@ -22,8 +22,8 @@ var StyleConfig = {
 };
 
 var settings = {
-    //HomePage: "https://www.facebook.com/"
-    HomePage: "https://news.ycombinator.com/"
+    HomePage: "https://www.facebook.com/"
+    //HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -282,7 +282,6 @@ var BrowserActions = {
                     if(status !== 'success'){
                         Tab.ViewPort.setText("Error when loading page: "+status);
                         screen.render();
-                    
                     }else{
                         sysEvents.OnTermkitNotice("Done Loading");
                         Tab.ViewPort.setText("");
@@ -292,7 +291,6 @@ var BrowserActions = {
                         renderTab(Tab, function(){
                             screen.render();
                         });
-
                     }
                 });
             }
@@ -336,13 +334,6 @@ function renderTab(Tab, OnDone){
 		TREErender(Tab, OnDone);
 		
 	});
-/*
-    TREErender(Tab, function(RenderTree){
-		Tab.LatestRenderTree = RenderTree;
-		
-	});
-*/
-    //JSrender(Tab, OnDone);
 }
 
 
@@ -356,25 +347,14 @@ function findOwner(Element){
 	return(false);
 }
 
-var DElem = [
-	//"CENTER",
-	//"TBODY",
-	//"BODY",
-	//"TABLE",
-	//"BR",
-	//"FORM",
-	//"A",
-	//"TR",
-	
+var DebugElementTypes = [
 	//"TD",//Causes the main Problem 
 ];
 var StrangTypes = [
-	"RenderTextControl",
-	"RenderBR",
-	"RenderInline",
-	"RenderText",//N/A
-	"RenderTableRow",//tr
-	//"RenderTableSection"//<TBODY>
+	"RenderBR",//BR is not rendereble
+	"RenderInline",//Is just a bounding box for text
+	"RenderText",//Are not actual elements
+	"RenderTableRow",//Table Rows are always posisioned wrongly
 ];
 
 //Renders the page based on the focusedFrameRenderTreeDump
@@ -394,13 +374,17 @@ function TREErender(Tab, OnDone){
 			}
 			
 			var BgC = Element.Attrs.bgcolor;
+			var BlessStyle = {
+				bg: Element.Attrs.bgcolor,
+				fg: Element.Attrs.color
+			};
 			if(typeof(Element.DomNode) != 'undefined'){
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
-					BgC = Element.DomNode.StyleObj.bg;
+					BlessStyle.bg = Element.DomNode.StyleObj.bg;
 					Element.BgColor = true;
 				}
 				if(typeof(Element.DomNode.StyleObj.fg) != 'undefined'){
-					Element.Attrs.color = Element.DomNode.StyleObj.fg;
+					BlessStyle.fg = Element.DomNode.StyleObj.fg;
 				}
 			}
 			if(!HasStartedAdding && Element.ElemType == 'BODY'){
@@ -411,28 +395,23 @@ function TREErender(Tab, OnDone){
 			
 			var PosRelativeTo = [0,0];
 			var ClosestOwnerWithBlessed = findOwner(Element);
-			if(ClosestOwnerWithBlessed && true){
+			if(ClosestOwnerWithBlessed){
 				PosRelativeTo = ClosestOwnerWithBlessed.Pos;
 				BlessOwner = ClosestOwnerWithBlessed.blessBox;
+				if(typeof(BlessStyle.bg) == 'undefined'){
+					BlessStyle.bg = ClosestOwnerWithBlessed.blessBox.options.style.bg;
+				}
 				//console.log("Addding as child")
 			}
+			
             if(typeof(Element.Text) == "undefined"){
-
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
-                if((Element.BgColor || false) && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
-				DElem.indexOf(Element.ElemType) == -1){
-					var Dbg = true;
-					if(!Element.BgColor){
-
-//Element.ElemType != "CENTER" && Element.ElemType != "TABLE" && "TBODY" != Element.ElemType && "TD" != Element.ElemType
-						//&& Element.Type != "RenderInline"){
-						BgC = "red"
-					}
+                if(Element.BgColor && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
+					DebugElementTypes.indexOf(Element.ElemType) == -1){
 					
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
-                    if(TermPos !== false && Dbg){
+                    if(TermPos !== false){
 						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
-						//console.log("Drawn:",Element._id+"="+Element.ElemType+" P"+TermPos.left+"x"+TermPos.top+" T"+[TermPos.left, TermPos.top].join('*')+" S"+TermPos.width+"x"+TermPos.height,'rel',PosRelativeTo.join('x'));
 						Element.blessBox = blessed.box({
                             parent: BlessOwner,
                             left: TermPos.left,
@@ -440,19 +419,13 @@ function TREErender(Tab, OnDone){
                             width: TermPos.width,
                             height: TermPos.height,
 							//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
-                            style: {
-                                'bg': BgC,
-                                'fg': Element.Attrs.color
-                            }
+                            style: BlessStyle
                         });
-						//box.setText(Element.Attrs.bgcolor+"");
-						//box.setText(Element.Text);
-                        //box.setText(Element.Type+"_"+StrObj(Element.Pos)+"_"+StrObj(Element.Size)+"_"+StrObj(TermPos));
                     }else{
-						//console.log("Size Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+						//console.log("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 					}
 				}else{
-					//console.log("Visi Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+					//console.log("Not a rendereble element:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
             }else{
                 var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
@@ -462,19 +435,9 @@ function TREErender(Tab, OnDone){
                     top: TermPos.top,
                     width: Element.Text.length,
                     height: 1,
-					//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
 					content: Element.Text,
-                    style: {
-                        'bg': Element.Attrs.bgcolor,
-                        'fg': Element.Attrs.color
-                    }
+                    style: BlessStyle
                 });
-                var RelPos = terminalConverter.getTerminalPos(PosRelativeTo, null);
-				//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id+"_"+[RelPos.left, RelPos.top].join('*'))
-                //box.setText(Element.Text);
-                //box.setText(StrObj(Element.Where));
-                //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
-                //console.log(Element.Pos[0]+"x"+Element.Pos[1],'Text', Element.Text);
             }
 
         });
