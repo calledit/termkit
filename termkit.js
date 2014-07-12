@@ -93,7 +93,7 @@ var terminalConverter = {
 			PosRelativeTo = [terminalConverter.getTerminalX(BrowsPosRelativeTo[0]), terminalConverter.getTerminalY(BrowsPosRelativeTo[1])];
 		}
 		var OnlyPos = false;
-        if(typeof(Size) == 'undefined'){
+        if(!Size){
 			Size = [0,0];
 			OnlyPos = true;
 		}
@@ -347,14 +347,35 @@ function renderTab(Tab, OnDone){
 
 
 function findOwner(Element){
-	if(Element.blessBox){
+	if(typeof(Element.blessBox) != 'undefined'){
 		return(Element);
 	}
-	if(Element._owner){
+	if(typeof(Element._owner) != 'undefined' && Element._owner != -1){
 		return(findOwner(Element._owner));
 	}
 	return(false);
 }
+
+var DElem = [
+	//"CENTER",
+	//"TBODY",
+	//"BODY",
+	//"TABLE",
+	//"BR",
+	//"FORM",
+	//"A",
+	//"TR",
+	
+	//"TD",//Causes the main Problem 
+];
+var StrangTypes = [
+	"RenderTextControl",
+	"RenderBR",
+	"RenderInline",
+	"RenderText",//N/A
+	"RenderTableRow",//tr
+	//"RenderTableSection"//<TBODY>
+];
 
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
@@ -372,9 +393,10 @@ function TREErender(Tab, OnDone){
 				//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
 			}
 			
+			var BgC = Element.Attrs.bgcolor;
 			if(typeof(Element.DomNode) != 'undefined'){
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
-					Element.Attrs.bgcolor = Element.DomNode.StyleObj.bg;
+					BgC = Element.DomNode.StyleObj.bg;
 					Element.BgColor = true;
 				}
 				if(typeof(Element.DomNode.StyleObj.fg) != 'undefined'){
@@ -389,29 +411,37 @@ function TREErender(Tab, OnDone){
 			
 			var PosRelativeTo = [0,0];
 			var ClosestOwnerWithBlessed = findOwner(Element);
-			if(ClosestOwnerWithBlessed){
+			if(ClosestOwnerWithBlessed && true){
 				PosRelativeTo = ClosestOwnerWithBlessed.Pos;
 				BlessOwner = ClosestOwnerWithBlessed.blessBox;
 				//console.log("Addding as child")
 			}
             if(typeof(Element.Text) == "undefined"){
-                if((Element.BgColor || false) && HasStartedAdding && Element.Type != "RenderTableRow"){
+
+				//Problems ocure when rendering stuff as it may overwrite its siblings children 
+                if((Element.BgColor || false) && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
+				DElem.indexOf(Element.ElemType) == -1){
+					var Dbg = true;
+					if(!Element.BgColor){
+
+//Element.ElemType != "CENTER" && Element.ElemType != "TABLE" && "TBODY" != Element.ElemType && "TD" != Element.ElemType
+						//&& Element.Type != "RenderInline"){
+						BgC = "red"
+					}
 					
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
-                    if(TermPos !== false){
-						console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
+                    if(TermPos !== false && Dbg){
+						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
 						//console.log("Drawn:",Element._id+"="+Element.ElemType+" P"+TermPos.left+"x"+TermPos.top+" T"+[TermPos.left, TermPos.top].join('*')+" S"+TermPos.width+"x"+TermPos.height,'rel',PosRelativeTo.join('x'));
 						Element.blessBox = blessed.box({
                             parent: BlessOwner,
                             left: TermPos.left,
                             top: TermPos.top,
                             width: TermPos.width,
-                            //width: Math.min(40,TermPos.width),
                             height: TermPos.height,
-                            //height: Math.min(4,TermPos.height),
 							//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
                             style: {
-                                'bg': Element.Attrs.bgcolor,
+                                'bg': BgC,
                                 'fg': Element.Attrs.color
                             }
                         });
@@ -419,25 +449,28 @@ function TREErender(Tab, OnDone){
 						//box.setText(Element.Text);
                         //box.setText(Element.Type+"_"+StrObj(Element.Pos)+"_"+StrObj(Element.Size)+"_"+StrObj(TermPos));
                     }else{
-						console.log("Size Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+						//console.log("Size Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 					}
 				}else{
-					console.log("Visi Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+					//console.log("Visi Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
             }else{
-                var TermPos = terminalConverter.getTerminalPos(Element.Pos);
+                var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
                 Element.blessBox = blessed.box({
-                    parent: Tab.ViewPort,//BlessOwner,
+                    parent: BlessOwner,
                     left: TermPos.left,
                     top: TermPos.top,
                     width: Element.Text.length,
                     height: 1,
+					//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
 					content: Element.Text,
                     style: {
                         'bg': Element.Attrs.bgcolor,
                         'fg': Element.Attrs.color
                     }
                 });
+                var RelPos = terminalConverter.getTerminalPos(PosRelativeTo, null);
+				//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id+"_"+[RelPos.left, RelPos.top].join('*'))
                 //box.setText(Element.Text);
                 //box.setText(StrObj(Element.Where));
                 //box.setText(Element.Pos[0]+"x"+Element.Pos[1]+"");
@@ -446,9 +479,9 @@ function TREErender(Tab, OnDone){
 
         });
 		//console.log(dumpText)
-		ShowRenderTree(RenderTree);
+		//ShowRenderTree(RenderTree);
 		//dump(RenderTree);
-		dbgclear();
+		//dbgclear();
 		//process.exit(1);
         OnDone(RenderTree);
     });   
