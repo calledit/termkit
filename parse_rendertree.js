@@ -143,47 +143,6 @@ var DefaultOwnerValues = {//These are overriden on initiantion
     bgcolor: 'red'
 };
 
-/*
-function GetWhoToPosTo(TxtLine, Who){
-	if(typeof(Who) == 'undefined'){
-		Who = 'self';
-	}
-	if(Who == 'self'){
-		if(TxtLine.Type == "layer" ){//Layers Are absolute 
-			return([0, 0]);
-		}
-		if(TxtLine.Owner.Type == "layer" ){//Layers Are absolute 
-			return(TxtLine.Owner.Pos);
-		}
-		if(positionIrelevantElements.indexOf(TxtLine.Type) != -1){
-			return(TxtLine.Owner.Pos);
-		}
-		
-		if(TxtLine.PosType == "relative positioned"){//Relativ to normal position //For our purpose that is just as normal
-			return(TxtLine.Owner.Pos);
-		}
-	}
-	if(Who != 'self'){
-		if(positionIrelevantElements.indexOf(TxtLine.Type) != -1 || TxtLine.PosType == "relative positioned"){
-			return(GetWhoToPosTo(TxtLine.Owner, 'static'));
-		}
-		if(TxtLine.PosType == "floating" && TxtLine.Owner.Type == "layer"){
-			return(GetWhoToPosTo(TxtLine.Owner, 'static'));
-		}
-		return(TxtLine.Pos);
-	}
-	return(GetWhoToPosTo(TxtLine.Owner, 'static'));
-}*/
-function getElementLayer(TxtLine){
-	if(TxtLine.Type == "layer"){
-		return(TxtLine);
-	}
-	if(TxtLine._owner == -1){
-		console.error("Could Not find any Layers over us, This should never hapen.");
-	}else{
-		return(getElementLayer(ElementIndex[TxtLine._owner]));
-	}
-}
 
 function GetLevel(Level, PharseLevels, Owner, callback){
     var Stuff = [];
@@ -206,78 +165,22 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 				if(typeof(Owner) == 'undefined'){//Is Root (The root is always a layer so this should not hapen)
 					
 				}else{
-					TxtLine._owner = Owner._id;
+					TxtLine._owner = Owner;
 				}
-				if(TxtLine._owner == -1){//Is Not Root
-					//console.error("Renderer Has no owner", TxtLine._id);
-					//return;
-				}
-				//console.log('Elements: Line:', '_id:', TxtLine._id, 'Type:', TxtLine.Type, 'Owner:', TxtLine._owner)
-				//console.log(TxtLine._owner)
-				//var PosRelTo = [ElementIndex[TxtLine._owner].Pos[0], ElementIndex[TxtLine._owner].Pos[1]];
-				//if(TxtLine.PosType == "floating"){//Floating elements postion does not base in the layer it is in
-				//	var LayerElementIsIn = getElementLayer(TxtLine);
-					//console.log("Float",TxtLine._id," is in layer",LayerElementIsIn._id,"LayerPos", LayerElementIsIn.Pos, "Owner", PosRelTo)
-					//PosRelTo[0] -= LayerElementIsIn.Pos[0];
-					//PosRelTo[1] -= LayerElementIsIn.Pos[1];
-					//console.log("Change","LayerPos", LayerElementIsIn.Pos, "PosRelTo", PosRelTo)
-				//}
-            	//TxtLine.Pos = [TxtLine.RelPos[0], TxtLine.RelPos[1]];
-/*
-				if(typeof(TxtLine.Size) != 'undefined'){//Only Elements that has size can own layers
-					var Key = TxtLine.Pos.join(",")+"_"+TxtLine.Size.join(",");
-					if(typeof(LayerPosSizeIndex[Key]) != 'undefined' && LayerPosSizeIndex[Key].length != 0){
-						var FoundLayer = LayerPosSizeIndex[Key].shift();
-						FoundLayer._owner = TxtLine._id;
-						TxtLine.childLayer = FoundLayer._id;
-						console.error("Found Children layer", FoundLayer);
-						
-						//FoundLayer.Attrs.bgcolor = TxtLine.Attrs.bgcolor;
-						//FoundLayer.Attrs.color = TxtLine.Attrs.color;
-						//console.error("two layers on the same spot");
-						//return;
-					}else{
-						//console.error("No layer at current element pos", TxtLine._id);
-						//return;
-					}
-				}
-*/
 			}else{//Is a layer
-				if(TxtLine._owner == -1){
-					//TxtLine._owner = Owner._id;
-					//console.error("Layer Has Not been assigned potential owner", TxtLine._id);
-				}
-				//TxtLine.Pos = TxtLine.RelPos;//Layers are exactly positioned
-				
-				//Remove Ourself from the layer list
-				//var Key = TxtLine.Pos.join(",")+"_"+TxtLine.Size.join(",");
-				//LayerPosSizeIndex[Key].shift();
-				//console.error("Set layer Pos:", TxtLine);
 			}
 			if(TxtLine.Text){
-				var PosRelTo = [ElementIndex[TxtLine._owner].Pos[0], ElementIndex[TxtLine._owner].Pos[1]];
+				var PosRelTo = [TxtLine._owner.Pos[0], TxtLine._owner.Pos[1]];
 				TxtLine.Pos = [TxtLine.RelPos[0] + PosRelTo[0], TxtLine.RelPos[1] + PosRelTo[1]];
 			}else{
 				TxtLine.Pos = [TxtLine.RelPos[0], TxtLine.RelPos[1]];
 			}
-
-		
-		//var PosTo = GetWhoToPosTo(TxtLine);
-        //    	TxtLine.Pos = [TxtLine.RelPos[0] + PosTo[0], TxtLine.RelPos[1] + PosTo[1]];
-		/*if(TxtLine.Type == "layer"){
-			TxtLine.Pos = TxtLine.RelPos;
-		}else{
-            		TxtLine.Pos = [TxtLine.RelPos[0] + Owner.BlockPos[0], TxtLine.RelPos[1] + Owner.BlockPos[1]];
-		}*/
 
 
 			if(typeof(Owner) != 'undefined' && typeof(Owner.Attrs) != 'undefined'){
 				if(typeof(TxtLine.Attrs.color) == 'undefined'){
 					TxtLine.Attrs.color = Owner.Attrs.color;
 				}
-				//if(typeof(TxtLine.Attrs.bgcolor) == 'undefined'){
-					//TxtLine.Attrs.bgcolor = Owner.Attrs.bgcolor;
-				//}
 				if(typeof(TxtLine.Size) == 'undefined'){
 					TxtLine.Size = Owner.Size;
 				}
@@ -292,12 +195,6 @@ function GetLevel(Level, PharseLevels, Owner, callback){
 					Owner.Attrs.color = DefaultOwnerValues.color;
 				}
 			}
-
-            /*if(positionIrelevantElements.indexOf(TxtLine.Type) == -1){
-                TxtLine.BlockPos = TxtLine.Pos;
-            }else{
-                TxtLine.BlockPos = Owner.BlockPos;
-            }*/
 
             if(typeof(TxtLine.Attrs.bgcolor) == 'undefined'){
                 TxtLine.BgColor = false;
@@ -314,9 +211,9 @@ function GetLevel(Level, PharseLevels, Owner, callback){
             Stuff.push(TxtLine);
         }else if(TxtLine.Indention > Level){
             PharseLevels.unshift(TxtLine);
-	    //console.log("NewLevel:",Level,Stuff[Stuff.length-1])
+			//console.log("NewLevel:",Level,Stuff[Stuff.length-1])
             Stuff[Stuff.length-1].children = GetLevel(TxtLine.Indention, PharseLevels, Stuff[Stuff.length-1], callback);
-	    //console.log("EndLevel:",Level,Stuff[Stuff.length-1])
+			//console.log("EndLevel:",Level,Stuff[Stuff.length-1])
         }else{
             PharseLevels.unshift(TxtLine);
             return(Stuff);

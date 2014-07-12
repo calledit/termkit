@@ -87,13 +87,25 @@ var terminalConverter = {
     },
     getTerminalY: function(browserY){
         return(Math.round(browserY/terminalConverter.FontSize));
-    },getTerminalPos: function(Pos, Size){
+    },getTerminalPos: function(Pos, Size, BrowsPosRelativeTo){
+		var PosRelativeTo = [0,0];
+        if(typeof(BrowsPosRelativeTo) != 'undefined'){
+			PosRelativeTo = [terminalConverter.getTerminalX(BrowsPosRelativeTo[0]), terminalConverter.getTerminalY(BrowsPosRelativeTo[1])];
+		}
+		var OnlyPos = false;
+        if(typeof(Size) == 'undefined'){
+			Size = [0,0];
+			OnlyPos = true;
+		}
         var Rets = {
-            left: terminalConverter.getTerminalX(Pos[0]),
-            top: terminalConverter.getTerminalY(Pos[1]),
-            right: terminalConverter.getTerminalX(Pos[0]+ Size[0]),
-            bottom: terminalConverter.getTerminalY(Pos[1]+ Size[1]),
+            left: terminalConverter.getTerminalX(Pos[0])-PosRelativeTo[0],
+            top: terminalConverter.getTerminalY(Pos[1])-PosRelativeTo[1],
+            right: terminalConverter.getTerminalX(Pos[0]+ Size[0])-PosRelativeTo[0],
+            bottom: terminalConverter.getTerminalY(Pos[1]+ Size[1])-PosRelativeTo[1],
         };
+		if(OnlyPos){
+			return(Rets);
+		}
         Rets.width = Rets.right - Rets.left;
         Rets.height = Rets.bottom - Rets.top;
         if(Rets.width <= 0 || Rets.height <= 0){
@@ -333,11 +345,23 @@ function renderTab(Tab, OnDone){
     //JSrender(Tab, OnDone);
 }
 
+
+function findOwner(Element){
+	if(Element.blessBox){
+		return(Element);
+	}
+	if(Element._owner){
+		return(findOwner(Element._owner));
+	}
+	return(false);
+}
+
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
 		//console.log(dumpText)
 		//process.exit(1);
+		var HasStartedAdding = false;
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
 
@@ -357,22 +381,35 @@ function TREErender(Tab, OnDone){
 					Element.Attrs.color = Element.DomNode.StyleObj.fg;
 				}
 			}
-            if(Element.ElemType == 'BODY'){
+			if(!HasStartedAdding && Element.ElemType == 'BODY'){
+				HasStartedAdding = true;
                 Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
             }
+			var BlessOwner = Tab.ViewPort;
+			
+			var PosRelativeTo = [0,0];
+			var ClosestOwnerWithBlessed = findOwner(Element);
+			if(ClosestOwnerWithBlessed){
+				PosRelativeTo = ClosestOwnerWithBlessed.Pos;
+				BlessOwner = ClosestOwnerWithBlessed.blessBox;
+				//console.log("Addding as child")
+			}
             if(typeof(Element.Text) == "undefined"){
-                if(Element.BgColor || true){
-                    var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size);
+                if((Element.BgColor || false) && HasStartedAdding && Element.Type != "RenderTableRow"){
+					
+                    var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
                     if(TermPos !== false){
-                        box = blessed.box({
-                            parent: Tab.ViewPort,
+						console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
+						//console.log("Drawn:",Element._id+"="+Element.ElemType+" P"+TermPos.left+"x"+TermPos.top+" T"+[TermPos.left, TermPos.top].join('*')+" S"+TermPos.width+"x"+TermPos.height,'rel',PosRelativeTo.join('x'));
+						Element.blessBox = blessed.box({
+                            parent: BlessOwner,
                             left: TermPos.left,
                             top: TermPos.top,
                             width: TermPos.width,
                             //width: Math.min(40,TermPos.width),
                             height: TermPos.height,
                             //height: Math.min(4,TermPos.height),
-							content: Element._id+"="+Element.ElemType+":"+Element.Size.join('x'),
+							//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
                             style: {
                                 'bg': Element.Attrs.bgcolor,
                                 'fg': Element.Attrs.color
@@ -388,10 +425,11 @@ function TREErender(Tab, OnDone){
 					console.log("Visi Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
             }else{
-                box = blessed.box({
-                    //parent: Tab.ViewPort,
-                    left: terminalConverter.getTerminalX(Element.Pos[0]),
-                    top: terminalConverter.getTerminalY(Element.Pos[1]),
+                var TermPos = terminalConverter.getTerminalPos(Element.Pos);
+                Element.blessBox = blessed.box({
+                    parent: Tab.ViewPort,//BlessOwner,
+                    left: TermPos.left,
+                    top: TermPos.top,
                     width: Element.Text.length,
                     height: 1,
 					content: Element.Text,
@@ -408,7 +446,7 @@ function TREErender(Tab, OnDone){
 
         });
 		//console.log(dumpText)
-		//ShowRenderTree(RenderTree);
+		ShowRenderTree(RenderTree);
 		//dump(RenderTree);
 		dbgclear();
 		//process.exit(1);
@@ -423,7 +461,7 @@ function ShowRenderTree(Tree){
 		for(var k=0;Tree[Num].Indention>k;k++){
 			Indent += "  ";
 		}
-		console.log(Indent, Tree[Num]._owner, "->", Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where, "->", Tree[Num].childLayer);
+		console.log(Indent, Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where, "->", Tree[Num].childLayer);
 		//console.log(Indent, Tree[Num].What, "at", Tree[Num].Where);
 		if(Tree[Num].children && Tree[Num].children.length != 0){
 			ShowRenderTree(Tree[Num].children);
