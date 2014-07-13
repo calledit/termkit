@@ -166,7 +166,7 @@ var sysEvents = {
 		if(typeof(process.argv[2]) != 'undefined'){
 			UrlToLoadOnStart = process.argv[2];
 		}
-        BrowserActions.newTab(UrlClean(UrlToLoadOnStart));
+        BrowserActions.newTab(UrlClean(UrlToLoadOnStart, 'Argv'));
         screen.render();
     },
     OnPhantomNotice: function(){
@@ -420,7 +420,7 @@ var BrowserActions = {
                 Tab.ViewPort.setText("Loading...");
                 Tab.ViewPort.style.bg = '#e86b55';
                 screen.render();
-                Tab.PhantomTab.open(UrlClean(Tab.BarUrlInput.value), function(status){
+                Tab.PhantomTab.open(UrlClean(Tab.BarUrlInput.value, 'UrlBar'), function(status){
                 });
             }
             Tab.BarUrlInput.on('submit', OnUrlSubmit);
@@ -529,6 +529,10 @@ function TREErender(Tab, OnDone){
 					if(Element.Ladder.indexOf("IFRAME") != -1){
 						return;
 					}
+					//Ignore svg stuff
+					if(Element.Ladder.indexOf("svg") != -1){
+						return;
+					}
 					//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
 				}
 			}
@@ -541,7 +545,10 @@ function TREErender(Tab, OnDone){
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
 					BlessStyle.bg = Element.DomNode.StyleObj.bg;
 					Element.BgColor = true;
+				}else if(typeof(Element.DomNode.backgroundImage) != 'undefined'){
+					Element.BgImage = Element.DomNode.backgroundImage;
 				}
+				
 				if(typeof(Element.DomNode.StyleObj.fg) != 'undefined'){
 					BlessStyle.fg = Element.DomNode.StyleObj.fg;
 				}
@@ -555,10 +562,10 @@ function TREErender(Tab, OnDone){
 			var BlessOwner = Tab.ViewPort;
 			
 			var PosRelativeTo = [0,0];
-			var ClosestOwnerWithBlessed = false;//findOwner(Element, 'blessBox', true);
-			if(ClosestOwnerWithBlessed){
-				PosRelativeTo = ClosestOwnerWithBlessed.Pos;
-				BlessOwner = ClosestOwnerWithBlessed.blessBox;
+			var ClosestLayerOwner = findOwner(Element, 'isLayer', true);
+			if(ClosestLayerOwner){
+				PosRelativeTo = ClosestLayerOwner.Pos;
+				BlessOwner = ClosestLayerOwner.blessBox;
 			}
 			
 			if(typeof(BlessStyle.bg) == 'undefined'){
@@ -611,11 +618,25 @@ function TREErender(Tab, OnDone){
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
+			//Background images cause more problems than they solve so they are inactivated
+			if(false && typeof(Element.BgImage) != 'undefined'){
+				Element.BgColor = true;
+				SpecialType = Element.ElemType;
+				BlessStyle.bg = "#7f7f7f";
+				BlessStyle.fg = "#000000";
+			}
+			//We dont render SVG i would ihowever like to render them as images
+			if(Element.Type == "RenderSVGRoot"){
+				Element.BgColor = true;
+				SpecialType = Element.ElemType;
+				BlessStyle.bg = "#7f7f7f";
+				BlessStyle.fg = "#000000";
+			}
 			//We dont render Iframes cause it would require more work
 			if(Element.Type == "RenderPartObject"){
 				Element.BgColor = true;
 				SpecialType = Element.ElemType;
-				BlessStyle.fg = "#7f7f7f";
+				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
 
@@ -848,7 +869,14 @@ function StrObj(Obj){
     return(JSON.stringify(Obj));
 }
 
-function UrlClean(url){
+function UrlClean(url, From){
+	if(typeof(From) != 'undefined'){
+		if(From == 'UrlBar' || From == 'Argv'){
+			if(url.indexOf('://') == -1){
+				url = 'https://'+url;
+			}
+		}
+	}
     return(url);
 }
 
