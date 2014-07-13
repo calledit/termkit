@@ -11,6 +11,9 @@ screen.key(['escape', 'q', 'C-c'], function(ch, key) {
 
 var StyleConfig = {
     MenuBgColor: '#C1C1C1',
+    MenuFgColor: '#000000',
+    MenuButtonBgColor: '#4D4D4D',
+    MenuButtonFgColor: '#FFFFFF',
     ViewPortBgColor: '#FFFFFF',
     InputBgColor: '#FFFFFF',
     InputFgColor: '#000000',
@@ -83,6 +86,12 @@ var terminalConverter = {
         //terminalConverter.browserSize.width = 1024;
         return(terminalConverter.browserSize);
     },
+    getBrowserX: function(TerminalX){
+        return(Math.round(TerminalX*terminalConverter.FontSize*terminalConverter.FontAspectRatio));
+    },
+    getBrowserY: function(TerminalY){
+        return(Math.round(TerminalY*terminalConverter.FontSize));
+    },
     getTerminalX: function(browserX){
         return(Math.round(browserX/(terminalConverter.FontSize*terminalConverter.FontAspectRatio)));
     },
@@ -120,12 +129,19 @@ terminalConverter.getBrowserSize();
 var Tabs = [];
 
 screen.key(['C-r'], function(ch, key) {
+	BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
+	screen.render();
+	
     renderTab(Tabs[termKitState.ActiveTab], function(){
         screen.render();
     });
 });
 screen.key(['backspace'], function(ch, key) {
 	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
+	
+	BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
+	screen.render();
+
     renderTab(Tabs[termKitState.ActiveTab], function(){
         screen.render();
     });
@@ -146,14 +162,20 @@ var phantomProccess = null;
 
 var sysEvents = {
     OnPhantomLoaded: function(){
-        BrowserActions.newTab(settings.HomePage);
+		var UrlToLoadOnStart = settings.HomePage;
+		if(typeof(process.argv[2]) != 'undefined'){
+			UrlToLoadOnStart = process.argv[2];
+		}
+        BrowserActions.newTab(UrlClean(UrlToLoadOnStart));
         screen.render();
     },
-    OnPhantomNotice: function(NoticeText){
-        ConsoleBox.unshiftLine(NoticeText);
+    OnPhantomNotice: function(){
+		var args = Array.prototype.slice.call(arguments);
+        ConsoleBox.unshiftLine(args.join(" "));
     },
-    OnTermkitNotice: function(NoticeText){
-        ConsoleBox.unshiftLine(NoticeText);
+    OnTermkitNotice: function(){
+		var args = Array.prototype.slice.call(arguments);
+        ConsoleBox.unshiftLine(args.join(" "));
     },
 };
 
@@ -177,9 +199,16 @@ phantom.create({
 
 var BrowserActions = {
 	clearTab: function(Tab){
+		var Kids = [];
 		for(var cid in Tab.ViewPort.children){
-			Tab.ViewPort.children[cid].detach();
+			Kids.push(Tab.ViewPort.children[cid]);
 		}
+		Kids.forEach(function(Kid){
+			Kid.detach();
+		});
+	},
+	reloadTab: function(Tab){
+		Tab.PhantomTab.reload();
 	},
     newTab: function(url){
         var loadWebsite = true;
@@ -188,6 +217,7 @@ var BrowserActions = {
             url = '';
         }
         var Tab = {};
+		Tab.LastViewPortScroll = 0;
 		Tab.SelectebleElements = [];
         Tab.BarForm = blessed.Form({
             parent: TopMenu,
@@ -207,7 +237,7 @@ var BrowserActions = {
             inputOnFocus: true,
             left: 1,
             top: 0,
-            width: '70%',
+            width: '65%',
             height: 1,
             style: {
                 'bg': StyleConfig.InputBgColor,
@@ -226,7 +256,7 @@ var BrowserActions = {
             keys: true,
             mouse: true,
             inputOnFocus: true,
-            left: '75%',
+            left: '70%',
             top: 0,
             width: '15%',
             height: 1,
@@ -241,10 +271,71 @@ var BrowserActions = {
                 },
             }
         });
+        Tab.DumpRenderTreeButton = blessed.Button({
+            parent: Tab.BarForm,
+            mouse: true,
+            left: '94%',
+            top: 0,
+			align: 'center',
+            width:  6,
+            height: 1,
+			content: 'Dump',
+            style: {
+                'bg': StyleConfig.MenuButtonBgColor,
+                'fg': StyleConfig.MenuButtonFgColor,
+                'focus':{
+                    'fg': StyleConfig.InputFgColor,
+                    'bg': StyleConfig.InputFocusBgColor,
+                },
+                'hover':{
+                    'bg': StyleConfig.InputHoverBgColor
+                },
+            }
+		});
+		Tab.DumpRenderTreeButton.on('press', function(){
+			if(typeof(Tab.LastRenderTree) != 'undefined'){
+				ShowRenderTree(Tab.LastRenderTree);
+				dbgclear();
+			}else{
+				sysEvents.OnPhantomNotice("No Render Tree to dump.");
+			}
+		});
+        Tab.AlterTextSizeBox = blessed.Checkbox({
+            parent: Tab.BarForm,
+            mouse: true,
+			checked: true,
+            left: '85%',
+            top: 0,
+            width:  13,
+            height: 1,
+            style: {
+                'bg': StyleConfig.MenuBgColor,
+                'fg': StyleConfig.MenuFgColor,
+                'focus':{
+                    'fg': StyleConfig.InputFgColor,
+                    'bg': StyleConfig.InputFocusBgColor,
+                },
+                'hover':{
+                    'bg': StyleConfig.InputHoverBgColor
+                },
+            }
+        });
+		Tab.AlterTextSizeBox.text = 'Font Fix';
+		//We need to reload the entire page to reset the fonts
+		Tab.AlterTextSizeBox.on('uncheck', function(){
+			BrowserActions.reloadTab(Tab);
+		});
+		Tab.AlterTextSizeBox.on('check', function(){
+			renderTab(Tab, function(){
+				screen.render();
+			});
+		});
+		
         Tab.ViewPort = blessed.box({
             parent: ViewPort,
             mouse: true,
             scrollable: true,
+			alwaysScroll: true,
             left: 0,
             top: 0,
             width: '100%',
@@ -253,45 +344,57 @@ var BrowserActions = {
                 'bg': StyleConfig.ViewPortBgColor
             }
         });
+		//Scroll phantom when we scroll blessed
+		Tab.ViewPort.on('scroll', function(){
+			///XXXX Se issue on blessed's github page
+			var NrOfScrollableLines = Tab.ViewPort.getScrollHeight() - Tab.ViewPort.height;
+			var BlessLinesY = Math.round(NrOfScrollableLines*(Tab.ViewPort.getScrollPerc()/100));
+			Tab.LastViewPortScroll = terminalConverter.getBrowserY(BlessLinesY);
+			Tab.PhantomTab.set('scrollPosition', {top:Tab.LastViewPortScroll,left:0});
+		});
+
         
         //Get A tab from phantom 
         phantomProccess.createPage(function(PTab){
             Tab.PhantomTab = PTab;
-
+			Tab.IsLoading = false;
             Tab.PhantomTab.set('onNavigationRequested', function(url, type, willNavigate, main){
 				if(main){
+					Tab.IsLoading = true;
+					sysEvents.OnPhantomNotice("onNavigationRequested:", type, url);
 					Tab.BarUrlInput.setValue(url);
 					BrowserActions.clearTab(Tab);
 					screen.render();
-					
-					setTimeout(function(){
-						/*renderTab(Tab, function(){
-							screen.render();
-						});*/
-						
-						onLoadFinished('success');//just fing render
-					},1500);
 				}
             });
             Tab.PhantomTab.set('onLoadFinished', onLoadFinished);
 			function onLoadFinished(status){
-				if(status !== 'success'){
-					Tab.ViewPort.setText("Error when loading page: "+status);
-					screen.render();
-				}else{
-					//setNav(Tab);
-					//sysEvents.OnTermkitNotice("Done Loading");
-					Tab.ViewPort.setText("");
-					Tab.ViewPort.style.bg = StyleConfig.DefaultTabBgColor;
-					screen.render();
-					
-					renderTab(Tab, function(){
+				if(Tab.IsLoading){
+					Tab.ViewPort.resetScroll();
+					sysEvents.OnPhantomNotice("onLoadFinished:", status);
+					if(status !== 'success'){
+						Tab.ViewPort.setText("Error when loading page: "+status);
 						screen.render();
-					});
+					}else{
+						Tab.ViewPort.setText("");
+						BrowserActions.clearTab(Tab)
+						Tab.ViewPort.style.bg = StyleConfig.DefaultTabBgColor;
+						screen.render();
+						
+						renderTab(Tab, function(){
+							screen.render();
+						});
+					}
+					Tab.IsLoading = false;
+				}else{
+					sysEvents.OnPhantomNotice("got onLoadFinished but nothing was loading");
 				}
-				Tab.PhantomTab.set('onLoadFinished', onLoadFinished);
+				//Tab.PhantomTab.set('onLoadFinished', onLoadFinished);
 			}
 
+			Tab.PhantomTab.set('onAlert', function(msg) {
+				sysEvents.OnPhantomNotice(msg);
+            });
 
             /*Causes phanthom to crach
 			Tab.PhantomTab.set('onConsoleMessage', function(msg, lineNum, sourceId) {
@@ -340,21 +443,31 @@ function renderTab(Tab, OnDone){
         Tab.ViewPort.remove(Tab.ViewPort.children[childId]);
         delete Tab.ViewPort.children[childId];
     }
-     Tab.PhantomTab.evaluate(function() {
-        if(!document.body){
-            return;
-        }
-        elems = document.body.getElementsByTagName("*");
-        for(i in elems){
-            if(elems[i].style){
-                elems[i].style.fontFamily = "monaco";
-                elems[i].style.lineHeight = "1";
-                elems[i].style.fontSize = "12px";
-                elems[i].style.verticalAlign = 'inherit';
-            }
-        }
-    },function(){});
 
+
+	//Tab.PhantomTab.evaluate(DbgShowMouseClicks,function(){});//For debuging mouse cliking of elements in webkit
+
+	
+	//Sometimes it is benefical to alter the page so it is more like the
+	//terminal somtimes it is not it depends on the page layout
+	if(Tab.AlterTextSizeBox.checked){
+		Tab.PhantomTab.evaluate(function() {
+			if(!document.body){
+				return;
+			}
+			elems = document.body.getElementsByTagName("*");
+			for(i in elems){
+				if(elems[i].style){
+					elems[i].style.fontFamily = "monaco";
+					elems[i].style.lineHeight = "1";
+					elems[i].style.fontSize = "12px";
+					elems[i].style.verticalAlign = 'inherit';
+				}
+			}
+		},function(){});
+	}
+	
+	//Get the dom tree and the render tree then use them to "render" the page.
 	JSdomInfo(Tab, function(jsLadderIndex){
 		Tab.jsLadderIndex = jsLadderIndex;
 		TREErender(Tab, OnDone);
@@ -363,12 +476,19 @@ function renderTab(Tab, OnDone){
 }
 
 
-function findOwner(Element){
-	if(typeof(Element.blessBox) != 'undefined'){
-		return(Element);
+function findOwner(Element, InheritAttrib, NotInheritable){
+	if(typeof(NotInheritable) != 'undefined'){
+		if(typeof(Element[InheritAttrib]) != 'undefined'){
+			return(Element);
+		}
+	}else{
+		if(typeof(Element.Inheritable) != 'undefined' && typeof(Element.Inheritable[InheritAttrib]) != 'undefined'){
+			return(Element);
+		}
 	}
+	
 	if(typeof(Element._owner) != 'undefined' && Element._owner != -1){
-		return(findOwner(Element._owner));
+		return(findOwner(Element._owner, InheritAttrib, NotInheritable));
 	}
 	return(false);
 }
@@ -398,14 +518,21 @@ function TREErender(Tab, OnDone){
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
 
-			if(typeof(Element.Ladder) != 'undefined' && typeof(Tab.jsLadderIndex[Element.Ladder]) != 'undefined' && Tab.jsLadderIndex[Element.Ladder].length != 0){
-				Element.DomNode = Tab.jsLadderIndex[Element.Ladder].shift();
-			}else{
-				
-				//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
+			if(typeof(Element.Ladder) != 'undefined'){
+				if(typeof(Tab.jsLadderIndex[Element.Ladder]) != 'undefined' && Tab.jsLadderIndex[Element.Ladder].length != 0){
+					Element.DomNode = Tab.jsLadderIndex[Element.Ladder].shift();
+				}else{
+					//We dont render iframes as that would require us to get
+					//a new dom tree and there is problem with owerflow and
+					//other things it is not imposible to fix but iframes is
+					//generaly only used for ads (and comments) these days.
+					if(Element.Ladder.indexOf("IFRAME") != -1){
+						return;
+					}
+					//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
+				}
 			}
 			
-			var BgC = Element.Attrs.bgcolor;
 			var BlessStyle = {
 				bg: Element.Attrs.bgcolor,
 				fg: Element.Attrs.color
@@ -423,22 +550,37 @@ function TREErender(Tab, OnDone){
 				HasStartedAdding = true;
                 Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
             }
+
+			Element.Inheritable = {};
 			var BlessOwner = Tab.ViewPort;
 			
 			var PosRelativeTo = [0,0];
-			var ClosestOwnerWithBlessed = findOwner(Element);
+			var ClosestOwnerWithBlessed = false;//findOwner(Element, 'blessBox', true);
 			if(ClosestOwnerWithBlessed){
 				PosRelativeTo = ClosestOwnerWithBlessed.Pos;
 				BlessOwner = ClosestOwnerWithBlessed.blessBox;
-				if(typeof(BlessStyle.bg) == 'undefined'){
-					BlessStyle.bg = ClosestOwnerWithBlessed.blessBox.options.style.bg;
-				}
-				//console.log("Addding as child")
 			}
+			
+			if(typeof(BlessStyle.bg) == 'undefined'){
+				var ClosestOwnerWithBg = findOwner(Element, 'bg');
+				if(ClosestOwnerWithBg){
+					BlessStyle.bg = ClosestOwnerWithBg.Inheritable.bg;
+				}else{
+					BlessStyle.bg = PageDefaultColorValues.bgcolor;
+				}
+			}
+			if(typeof(BlessStyle.fg) == 'undefined'){
+				var ClosestOwnerWithFg = findOwner(Element, 'fg');
+				if(ClosestOwnerWithFg){
+					BlessStyle.fg = ClosestOwnerWithFg.Inheritable.fg;
+				}else{
+					BlessStyle.fg = PageDefaultColorValues.color;
+				}
+			}
+			
 
 			var BlesSettings = {
 				parent: BlessOwner,
-				//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
 				style: BlessStyle
 			};
 
@@ -452,17 +594,40 @@ function TREErender(Tab, OnDone){
 			}
 			if(Element.Selecteble_id){
 				BlesSettings.clickable = true;
+				
+				//Selecteble text is underlined so one can know it is selecteble
+				if(typeof(Element.Text) != "undefined"){
+					BlessStyle.underline = true;
+				}
 			}
 			
+			//Handle special Types that we need "shadow dom" for
 			var SpecialType = false;
 			
+			//I would like to convert images to assci drawings
 			if(Element.Type == "RenderImage"){
 				Element.BgColor = true;
-				SpecialType = 'IMG';
+				SpecialType = Element.ElemType;
 				BlessStyle.bg = "#7f7f7f";
+				BlessStyle.fg = "#000000";
+			}
+			//We dont render Iframes cause it would require more work
+			if(Element.Type == "RenderPartObject"){
+				Element.BgColor = true;
+				SpecialType = Element.ElemType;
+				BlessStyle.fg = "#7f7f7f";
+				BlessStyle.fg = "#000000";
 			}
 
+			//Save Inheritable properties
+			if(typeof(BlessStyle.bg) != 'undefined'){
+				Element.Inheritable.bg = BlessStyle.bg;
+			}
+			if(typeof(BlessStyle.fg) != 'undefined'){
+				Element.Inheritable.fg = BlessStyle.fg;
+			}
 			
+			//Create blessed elements
             if(typeof(Element.Text) == "undefined"){
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
                 if(Element.BgColor && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
@@ -501,26 +666,34 @@ function TREErender(Tab, OnDone){
 				Element.blessBox.on('click', function(mouse){
 					BrowserActions.clearTab(Tab)
 					Tab.ViewPort.style.bg = '#e86b55';
-					//Tab.PhantomTab.sendEvent('click',Element.Pos[0]+10, Element.Pos[1]+12);
-					Tab.PhantomTab.sendEvent('click',Element.Pos[0]+0, Element.Pos[1]+19);//i have tested an the click values that has worked is betwean 12 & 25
+					
+					//Figure out where the midle of the element is so we can send a click event to webkit 
+					var ClickX = Element.Pos[0];
+					var ClickY = Element.Pos[1];
+					//sysEvents.OnTermkitNotice("cliked object pos: "+(ClickX)+"x"+(ClickY));//Where did we click
+					ClickY -= Tab.LastViewPortScroll;
+					//sysEvents.OnTermkitNotice("Adjusted for Tab.LastViewPortScroll: "+(ClickY));//Where did we click
+					var InheritSize = findOwner(Element, 'Size', true);
+					if(InheritSize){
+						//sysEvents.OnTermkitNotice("Outside Owner Size:", InheritSize.Size[0], InheritSize.Size[1]);//If clicking does not work
+						if(typeof(Element.TextWidth) != 'undefined'){
+							ClickX += Math.round(Element.TextWidth/2);
+						}else{
+							ClickX += Math.round(InheritSize.Size[0]/2);
+						}
+						ClickY += Math.round(InheritSize.Size[1]/2);
+					}
+					
+					//sysEvents.OnTermkitNotice("cliking("+Element.ElemType+") at"+(ClickX)+"x"+(ClickY));//Where did we acctually click
+					Tab.PhantomTab.sendEvent('click', ClickX, ClickY);
 					screen.render();
-					/*for(var k=0;15>k;k++){
-								sysEvents.OnTermkitNotice("submited: "+(Element.Pos[0]+10)+"x"+ ((k*2)+5));
-								Tab.PhantomTab.sendEvent('click',Element.Pos[0]+10, (k*2)+5);
-								//Tab.PhantomTab.sendEvent('click',Element.Pos[0]+20, (k*2)+5);
-					}*/
-					//sysEvents.OnTermkitNotice("cliked("+Element.ElemType+") at"+(Element.Pos[0])+"x"+(Element.Pos[1]));
-					//Element.blessBox.setContent("Got click");
-					//console.log("GotC", Element.Pos[0]+4, Element.Pos[1]+4);
 				});
-				//Element.blessBox.on('click', (function(Elem){return(function(mouse){
-				//	Elem.blessBox.setContent("Got click");
-				//})})(Element));
 			}
 
         });
 		//console.log(dumpText)
 		//dump(RenderTree);
+		Tab.LastRenderTree = RenderTree; 
 		//ShowRenderTree(RenderTree);
 		//dbgclear();
 		//process.exit(1);
@@ -737,4 +910,46 @@ function dbgclear(){
 	for(var k=0;screen.height*2>k;k++){
 		console.log("Break");
 	}
+}
+
+function DbgShowMouseClicks(){
+function handleEvent(e){
+ var evt = e ? e:window.event;
+ var clickX=0, clickY=0;
+
+ if ((evt.clientX || evt.clientY) &&
+     document.body &&
+     document.body.scrollLeft!=null) {
+  clickX = evt.clientX + document.body.scrollLeft;
+  clickY = evt.clientY + document.body.scrollTop;
+ }
+ if ((evt.clientX || evt.clientY) &&
+     document.compatMode=='CSS1Compat' && 
+     document.documentElement && 
+     document.documentElement.scrollLeft!=null) {
+  clickX = evt.clientX + document.documentElement.scrollLeft;
+  clickY = evt.clientY + document.documentElement.scrollTop;
+ }
+ if (evt.pageX || evt.pageY) {
+  clickX = evt.pageX;
+  clickY = evt.pageY;
+ }
+
+
+element = document.querySelectorAll("td.title a")[2];
+rect = element.getClientRects()[0]
+var FirstAPos = Math.round(rect.left)+"x"+Math.round(rect.top)+" "+Math.round(rect.width)+"x"+Math.round(rect.height);
+
+ alert(evt.type.toUpperCase() + ' mouse event:'
+  +' pageX = ' + clickX
+  +' pageY = ' + clickY 
+  +' clientX = ' + evt.clientX
+  +' clientY = '  + evt.clientY 
+  +' screenX = ' + evt.screenX 
+  +' screenY = ' + evt.screenY
+  +'\n Inside Object Size:'+FirstAPos
+ )
+ return true;
+}
+document.body.onclick = handleEvent;
 }
