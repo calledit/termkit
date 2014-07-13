@@ -63,6 +63,9 @@ module.exports = function(focusedFrameRenderTreeDump, DefaultOwnerVal, callback)
                         var WhereStr = Thing.Where;
                         if("text run" == Thing.What){
                             var ColPos = WhereStr.indexOf(": ");
+							var WidthPosStr = WhereStr.substr(0, ColPos);
+							Thing.TextWidth = WidthPosStr.split('width ')[1];
+							Thing.TextWidth = parseInt(Thing.TextWidth);
                             LocationInfo = WhereStr.substr(0, ColPos+2).split(' ');
                             Thing.Text = WhereStr.substring(ColPos+3, WhereStr.length - 1);
                             
