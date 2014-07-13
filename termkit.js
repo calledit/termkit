@@ -22,9 +22,9 @@ var StyleConfig = {
 };
 
 var settings = {
-    HomePage: "https://www.youtube.com/"
+    //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    //HomePage: "https://news.ycombinator.com/"
+    HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -124,6 +124,12 @@ screen.key(['C-r'], function(ch, key) {
         screen.render();
     });
 });
+screen.key(['backspace'], function(ch, key) {
+	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
+    renderTab(Tabs[termKitState.ActiveTab], function(){
+        screen.render();
+    });
+});
 screen.on('resize', function(){
     ViewPort.height = screen.height - TopMenu.height - ConsoleBox.height;
     terminalConverter.getBrowserSize();
@@ -170,6 +176,11 @@ phantom.create({
 });
 
 var BrowserActions = {
+	clearTab: function(Tab){
+		for(var cid in Tab.ViewPort.children){
+			Tab.ViewPort.children[cid].detach();
+		}
+	},
     newTab: function(url){
         var loadWebsite = true;
         if(typeof(url) == 'undefined'){
@@ -177,6 +188,7 @@ var BrowserActions = {
             url = '';
         }
         var Tab = {};
+		Tab.SelectebleElements = [];
         Tab.BarForm = blessed.Form({
             parent: TopMenu,
             keys: true,
@@ -245,27 +257,52 @@ var BrowserActions = {
         //Get A tab from phantom 
         phantomProccess.createPage(function(PTab){
             Tab.PhantomTab = PTab;
-            /*Tab.PhantomTab.set('onConsoleMessage', function(msg, lineNum, sourceId) {
-                document.write(msg)
-                //console.log('CONSOLE: ' + msg);
-                //process.exit(1);
-            }, function(){});
-*/
-            /*Tab.PhantomTab.set('onError', function(msg, trace) {
 
-              var msgStack = ['ERROR: ' + msg];
+            Tab.PhantomTab.set('onNavigationRequested', function(url, type, willNavigate, main){
+				if(main){
+					Tab.BarUrlInput.setValue(url);
+					BrowserActions.clearTab(Tab);
+					screen.render();
+					
+					setTimeout(function(){
+						/*renderTab(Tab, function(){
+							screen.render();
+						});*/
+						
+						onLoadFinished('success');//just fing render
+					},1500);
+				}
+            });
+            Tab.PhantomTab.set('onLoadFinished', onLoadFinished);
+			function onLoadFinished(status){
+				if(status !== 'success'){
+					Tab.ViewPort.setText("Error when loading page: "+status);
+					screen.render();
+				}else{
+					//setNav(Tab);
+					//sysEvents.OnTermkitNotice("Done Loading");
+					Tab.ViewPort.setText("");
+					Tab.ViewPort.style.bg = StyleConfig.DefaultTabBgColor;
+					screen.render();
+					
+					renderTab(Tab, function(){
+						screen.render();
+					});
+				}
+				Tab.PhantomTab.set('onLoadFinished', onLoadFinished);
+			}
 
-              if (trace && trace.length) {
-                msgStack.push('TRACE:');
-                trace.forEach(function(t) {
-                  msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function +'")' : ''));
-                });
-              }
 
-              //console.error(msgStack.join('\n'));
-                //process.exit(1);
-
+            /*Causes phanthom to crach
+			Tab.PhantomTab.set('onConsoleMessage', function(msg, lineNum, sourceId) {
+				console.log(msg);
             });*/
+
+            /*Causes Phantom to crach
+			Tab.PhantomTab.set('onError', function(msg) {
+				sysEvents.OnPhantomNotice(msg)
+			});*/
+
             
             Tab.PhantomTab.set('viewportSize', terminalConverter.browserSize);
             
@@ -276,23 +313,11 @@ var BrowserActions = {
 
             Tab.BarUrlInput.setValue(url);
             function OnUrlSubmit(){
+				BrowserActions.clearTab(Tab)
                 Tab.ViewPort.setText("Loading...");
                 Tab.ViewPort.style.bg = '#e86b55';
                 screen.render();
                 Tab.PhantomTab.open(UrlClean(Tab.BarUrlInput.value), function(status){
-                    if(status !== 'success'){
-                        Tab.ViewPort.setText("Error when loading page: "+status);
-                        screen.render();
-                    }else{
-                        sysEvents.OnTermkitNotice("Done Loading");
-                        Tab.ViewPort.setText("");
-                        Tab.ViewPort.style.bg = StyleConfig.DefaultTabBgColor;
-                        screen.render();
-                        
-                        renderTab(Tab, function(){
-                            screen.render();
-                        });
-                    }
                 });
             }
             Tab.BarUrlInput.on('submit', OnUrlSubmit);
@@ -358,6 +383,12 @@ var StrangTypes = [
 	"RenderTableRow",//Table Rows are always posisioned wrongly
 ];
 
+var SelectebleElementTypes = [
+	"A",
+	"INPUT",
+	"BUTTON",
+];
+
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
     var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
@@ -404,6 +435,24 @@ function TREErender(Tab, OnDone){
 				}
 				//console.log("Addding as child")
 			}
+
+			var BlesSettings = {
+				parent: BlessOwner,
+				//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
+				style: BlessStyle
+			};
+
+			if(SelectebleElementTypes.indexOf(Element.ElemType) != -1){
+				Tab.SelectebleElements.push(Element._id)
+				Element.Selecteble_id = Element._id;
+			}else{
+				if(Element._owner && Element._owner.Selecteble_id){
+					Element.Selecteble_id = Element._owner.Selecteble_id;
+				}
+			}
+			if(Element.Selecteble_id){
+				BlesSettings.clickable = true;
+			}
 			
 			var SpecialType = false;
 			
@@ -412,6 +461,7 @@ function TREErender(Tab, OnDone){
 				SpecialType = 'IMG';
 				BlessStyle.bg = "#7f7f7f";
 			}
+
 			
             if(typeof(Element.Text) == "undefined"){
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
@@ -420,16 +470,11 @@ function TREErender(Tab, OnDone){
 					
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
                     if(TermPos !== false){
+						BlesSettings.left = TermPos.left;
+						BlesSettings.top = TermPos.top;
+						BlesSettings.width = TermPos.width;
+						BlesSettings.height = TermPos.height;
 						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
-						var BlesSettings = {
-                            parent: BlessOwner,
-                            left: TermPos.left,
-                            top: TermPos.top,
-                            width: TermPos.width,
-                            height: TermPos.height,
-							//content: Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id,
-                            style: BlessStyle
-                        };
 						if(SpecialType != false){
 							BlesSettings.content = SpecialType;
 							BlesSettings.valign = 'middle';
@@ -444,16 +489,34 @@ function TREErender(Tab, OnDone){
 				}
             }else{
                 var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
-                Element.blessBox = blessed.box({
-                    parent: BlessOwner,
-                    left: TermPos.left,
-                    top: TermPos.top,
-                    width: Element.Text.length,
-                    height: 1,
-					content: Element.Text,
-                    style: BlessStyle
-                });
+				BlesSettings.left = TermPos.left;
+				BlesSettings.top = TermPos.top;
+				BlesSettings.width = Element.Text.length;
+				BlesSettings.height = 1;
+				BlesSettings.content = Element.Text;
+				
+				Element.blessBox = blessed.box(BlesSettings);
             }
+			if(BlesSettings.clickable && Element.blessBox){
+				Element.blessBox.on('click', function(mouse){
+					BrowserActions.clearTab(Tab)
+					Tab.ViewPort.style.bg = '#e86b55';
+					//Tab.PhantomTab.sendEvent('click',Element.Pos[0]+10, Element.Pos[1]+12);
+					Tab.PhantomTab.sendEvent('click',Element.Pos[0]+0, Element.Pos[1]+19);//i have tested an the click values that has worked is betwean 12 & 25
+					screen.render();
+					/*for(var k=0;15>k;k++){
+								sysEvents.OnTermkitNotice("submited: "+(Element.Pos[0]+10)+"x"+ ((k*2)+5));
+								Tab.PhantomTab.sendEvent('click',Element.Pos[0]+10, (k*2)+5);
+								//Tab.PhantomTab.sendEvent('click',Element.Pos[0]+20, (k*2)+5);
+					}*/
+					//sysEvents.OnTermkitNotice("cliked("+Element.ElemType+") at"+(Element.Pos[0])+"x"+(Element.Pos[1]));
+					//Element.blessBox.setContent("Got click");
+					//console.log("GotC", Element.Pos[0]+4, Element.Pos[1]+4);
+				});
+				//Element.blessBox.on('click', (function(Elem){return(function(mouse){
+				//	Elem.blessBox.setContent("Got click");
+				//})})(Element));
+			}
 
         });
 		//console.log(dumpText)
