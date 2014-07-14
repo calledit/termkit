@@ -10,6 +10,14 @@
 #Install js modules
 #the master branch of blessed has some horible bugs so we use git directly to get a fork with out those bugs. When resolved use: npm install phantom blessed
 npm install phantom
+NpmResult=$?
+if [ "${NpmResult}" != "0" ] 
+then
+	echo "npm failed. Do you have npm installed? Are our nodejs version to old? termkit is developed on latest stable nodejs"
+	echo "A posible solution may be: sudo apt-get install nodejs npm"
+	exit
+fi
+
 cd node_modules
 git clone https://github.com/callesg/blessed
 cd ..
@@ -26,5 +34,4 @@ git apply ../termkit/renderTreeDump.patch
 
 #Move the binary in to place
 mv bin/phantomjs ../termkit/patched_phantomjs
-```
 
