@@ -4,6 +4,16 @@ Based on nodejs, phantomjs, and blessed
 To enter a new url press the urlbar with our mouse
 scroll with your mouse scroll wheel
 
+## Status
+
+The browser is functional forms are not yeat implemented
+
+### Switch to a more solid base
+It would be preferable if termkit integrated directly with the layout engine.
+Instead of throgh phantomjs as it is right now. That might take some more
+extensive work.
+ 
+
 
 ![Facebook screenshot](/misc/Facebook.png)
 
@@ -13,18 +23,7 @@ scroll with your mouse scroll wheel
 ```bash
 git clone https://github.com/callesg/termkit.git
 cd termkit
-npm install phantom blessed
-
-#Then get a copy of phantom js
-cd ..
-git clone https://github.com/ariya/phantomjs.git
-cd phantomjs
-#Apply patch to phantomjs and webkit
-git apply ../termkit/renderTreeDump.patch
-#build phantomjs
+#Clone a copy of phantom js patch and build it
 ./build.sh
-
-#Move the binary in to place
-mv bin/phantomjs ../termkit/patched_phantomjs
 ```
 
