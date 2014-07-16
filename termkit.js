@@ -25,9 +25,9 @@ var StyleConfig = {
 };
 
 var settings = {
-    //HomePage: "https://www.youtube.com/"
+    HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    HomePage: "https://news.ycombinator.com/"
+    //HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -515,6 +515,7 @@ function TREErender(Tab, OnDone){
 		//console.log(dumpText)
 		//process.exit(1);
 		var HasStartedAdding = false;
+		var ZindexMap = [];
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
 
@@ -562,7 +563,7 @@ function TREErender(Tab, OnDone){
 			var BlessOwner = Tab.ViewPort;
 			
 			var PosRelativeTo = [0,0];
-			var ClosestLayerOwner = findOwner(Element, 'isLayer', true);
+			var ClosestLayerOwner = findOwner(Element._owner, 'ZIndex', true);
 			if(ClosestLayerOwner){
 				PosRelativeTo = ClosestLayerOwner.Pos;
 				BlessOwner = ClosestLayerOwner.blessBox;
@@ -607,6 +608,16 @@ function TREErender(Tab, OnDone){
 					BlessStyle.underline = true;
 				}
 			}
+			if(typeof(Element.Inheritable.ZIndex) != 'undefined'){
+				//Element.ZIndex = Element.Inheritable.ZIndex;
+			}
+			if(typeof(Element.ZIndex) != 'undefined'){
+				if(typeof(ZindexMap[Element.ZIndex]) == 'undefined'){
+					ZindexMap[Element.ZIndex] = [];
+				}
+				ZindexMap[Element.ZIndex].push(Element);
+				//Element.blessBox.setFront();
+			}
 			
 			//Handle special Types that we need "shadow dom" for
 			var SpecialType = false;
@@ -639,11 +650,21 @@ function TREErender(Tab, OnDone){
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
+			//we need to render elements that has ZIndex so that they get a blessbox that their kids can attach to
+			if(typeof(Element.ZIndex) != 'undefined'){
+				Element.BgColor = true;
+				if(typeof(BlessStyle.bg) == 'undefined'){
+					BlessStyle.bg = "#7f7f7f";
+				}
+			}
 
 			//Save Inheritable properties
 			if(typeof(BlessStyle.bg) != 'undefined'){
 				Element.Inheritable.bg = BlessStyle.bg;
 			}
+			/*if(typeof(Element.ZIndex) != 'undefined'){
+				Element.Inheritable.ZIndex = Element.ZIndex;
+			}*/
 			if(typeof(BlessStyle.fg) != 'undefined'){
 				Element.Inheritable.fg = BlessStyle.fg;
 			}
@@ -667,6 +688,9 @@ function TREErender(Tab, OnDone){
 							BlesSettings.align = 'center';
 						}
 						Element.blessBox = blessed.box(BlesSettings);
+						if(typeof(Element.ZIndex) != 'undefined'){
+							//Element.blessBox.setIndex(Element.ZIndex);
+						}
                     }else{
 						//console.log("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 					}
@@ -712,6 +736,16 @@ function TREErender(Tab, OnDone){
 			}
 
         });
+
+		for(var ZIndex in ZindexMap){
+			var ElLen = ZindexMap[ZIndex].length-1;
+			for(var num in ZindexMap[ZIndex]){
+				var backNum = ElLen-num;
+				if(ZindexMap[ZIndex][backNum].blessBox){
+					ZindexMap[ZIndex][backNum].blessBox.setFront()
+				}
+			}
+		}
 		//console.log(dumpText)
 		//dump(RenderTree);
 		Tab.LastRenderTree = RenderTree; 
@@ -719,7 +753,7 @@ function TREErender(Tab, OnDone){
 		//dbgclear();
 		//process.exit(1);
         OnDone(RenderTree);
-    });   
+    });
 
 }
 
