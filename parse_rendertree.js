@@ -49,6 +49,15 @@ module.exports = function(focusedFrameRenderTreeDump, DefaultOwnerVal, callback)
 								}
 								Thing.Addr = parseInt(WhatStuff.substr(0, AddrEnd));
 							}
+                            var zIStart = WhatStuff.indexOf("zI: ");
+							if(zIStart != -1){
+								zIText = WhatStuff.substr(zIStart+4);
+								var zIEnd = zIText.indexOf(" ");
+								if(zIEnd == -1){
+									zIEnd = zIText.length;
+								}
+								Thing.ZIndex = parseInt(zIText.substr(0, zIEnd));
+							}
 
                             var elemTypeStart = WhatStuff.indexOf("{");
                             var elemTypeEnd = WhatStuff.indexOf("}");
