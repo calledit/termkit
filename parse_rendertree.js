@@ -13,6 +13,12 @@ module.exports = function(focusedFrameRenderTreeDump, DefaultOwnerVal, callback)
 				var IdCounter = 0;
                 for(LineNum in RenderTreeDump){
                     var Line = RenderTreeDump[LineNum];
+                    var LPos = Line.indexOf("haslayer");
+					var hasLayer = false;
+					if(LPos == 0){
+						hasLayer = true;
+						Line = Line.substr(8);
+					}
                     var AtPos = Line.indexOf(" at ");
                     if(AtPos != -1){
                         var Indention = Line.match(SpacesFinder)[0].length;
@@ -24,6 +30,9 @@ module.exports = function(focusedFrameRenderTreeDump, DefaultOwnerVal, callback)
                             'Indention': Indention / 2,
                             'Attrs': {},
                         };
+						if(hasLayer){
+							Thing.Layer = 1;//This should be the layer zindex
+						}
                         
                         var typeEnd = Thing.What.indexOf(" ");
                         Thing.PosType = 'normal';
