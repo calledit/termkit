@@ -141,10 +141,12 @@ screen.key(['C-r'], function(ch, key) {
 
 screen.key(['down'], function(ch, key) {//PgUp
 	BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
 screen.key(['up'], function(ch, key) {//PgDown
 	BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
 screen.key(['backspace'], function(ch, key) {
@@ -183,12 +185,12 @@ var sysEvents = {
     OnPhantomNotice: function(){
 		ConsoleMessageId += 1;
 		var args = Array.prototype.slice.call(arguments);
-        ConsoleBox.unshiftLine(""+ConsoleMessageId+args.join(" "));
+        ConsoleBox.unshiftLine(""+ConsoleMessageId+" "+args.join(" "));
     },
     OnTermkitNotice: function(){
 		ConsoleMessageId += 1;
 		var args = Array.prototype.slice.call(arguments);
-        ConsoleBox.unshiftLine(""+ConsoleMessageId+args.join(" "));
+        ConsoleBox.unshiftLine(""+ConsoleMessageId+" "+args.join(" "));
     },
 };
 
@@ -349,6 +351,8 @@ var BrowserActions = {
             mouse: true,
             scrollable: true,
 			alwaysScroll: true,
+			//noOverflow:true,
+			//baseLimit: 0,
             left: 0,
             top: 0,
             width: '100%',
@@ -357,6 +361,7 @@ var BrowserActions = {
                 'bg': StyleConfig.ViewPortBgColor
             }
         });
+
 		//Scroll phantom when we scroll blessed
 		Tab.ViewPort.on('scroll', function(){
 			var BlessLinesY = BlessGetScroll(Tab.ViewPort);
@@ -527,6 +532,10 @@ function TREErender(Tab, OnDone){
 		//process.exit(1);
 		var HasStartedAdding = false;
 		var ZindexMap = [];
+		var RootBless = Tab.ViewPort;/*blessed.Box({
+			parent:Tab.ViewPort,
+			shrink: true,
+		});*/
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
 			var DrawBox = false;
@@ -575,22 +584,29 @@ function TREErender(Tab, OnDone){
             }
 
 			Element.Inheritable = {};
-			var BlessOwner = Tab.ViewPort;
+			var BlessOwner = RootBless;
 			
 			var PosRelativeTo = [0,0];
 			var ClosestLayerOwner = findOwner(Element._owner, 'Layer', true);
 			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
 				DrawBox = true;
-				PosRelativeTo = ClosestLayerOwner.Pos;
-				BlessOwner = ClosestLayerOwner.blessBox;
+				//PosRelativeTo = ClosestLayerOwner.Pos;
+				//BlessOwner = ClosestLayerOwner.blessBox;
 			}
 			
 			
 
 			var BlesSettings = {
 				parent: BlessOwner,
-				style: BlessStyle
+				style: BlessStyle,
+				//shrink: false,
+				//scrollable: false,
+				//fixed: true,
+				//childBase: 0
 			};
+			if(!BlessOwner.scrollable){
+				//BlesSettings.fixed = true;
+			}
 
 			if(SelectebleElementTypes.indexOf(Element.ElemType) != -1){
 				Tab.SelectebleElements.push(Element._id)
@@ -769,7 +785,7 @@ function TREErender(Tab, OnDone){
 			for(var num in ZindexMap[ZIndex]){
 				var backNum = ElLen-num;
 				if(ZindexMap[ZIndex][backNum].blessBox){
-					ZindexMap[ZIndex][backNum].blessBox.setFront()
+					//ZindexMap[ZIndex][backNum].blessBox.setFront()
 				}
 			}
 		}
@@ -1000,7 +1016,10 @@ function BlessGetScroll(Box){
 	return(Box.childBase);
 }
 function BlessChangeScroll(Lines, Box){
+	//Box.childBase = Lines;
+	//Box.childOffset = Lines;
 	Box.setScroll(Box.childBase+Box.childOffset+Lines)
+	//Box.setScroll(Box.childBase+Box.childOffset+Lines)
 	
 	//var NrOfScrollableLines = Box.getScrollHeight();// - Box.height;
 	//var PercentChange = Lines/NrOfScrollableLines;
