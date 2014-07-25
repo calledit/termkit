@@ -25,9 +25,11 @@ var StyleConfig = {
 };
 
 var settings = {
-    HomePage: "https://www.youtube.com/"
+	ScrollMultiplier: 0.5,
+    //HomePage: "http://www.svt.se/"
+    //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    //HomePage: "https://news.ycombinator.com/"
+    HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -136,6 +138,15 @@ screen.key(['C-r'], function(ch, key) {
         screen.render();
     });
 });
+
+screen.key(['down'], function(ch, key) {//PgUp
+	BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+    screen.render();//Manual scroll does not call render
+});
+screen.key(['up'], function(ch, key) {//PgDown
+	BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+    screen.render();//Manual scroll does not call render
+});
 screen.key(['backspace'], function(ch, key) {
 	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
 	
@@ -159,7 +170,7 @@ screen.on('resize', function(){
 });
 
 var phantomProccess = null;
-
+var ConsoleMessageId = 0;
 var sysEvents = {
     OnPhantomLoaded: function(){
 		var UrlToLoadOnStart = settings.HomePage;
@@ -170,12 +181,14 @@ var sysEvents = {
         screen.render();
     },
     OnPhantomNotice: function(){
+		ConsoleMessageId += 1;
 		var args = Array.prototype.slice.call(arguments);
-        ConsoleBox.unshiftLine(args.join(" "));
+        ConsoleBox.unshiftLine(""+ConsoleMessageId+args.join(" "));
     },
     OnTermkitNotice: function(){
+		ConsoleMessageId += 1;
 		var args = Array.prototype.slice.call(arguments);
-        ConsoleBox.unshiftLine(args.join(" "));
+        ConsoleBox.unshiftLine(""+ConsoleMessageId+args.join(" "));
     },
 };
 
@@ -346,9 +359,7 @@ var BrowserActions = {
         });
 		//Scroll phantom when we scroll blessed
 		Tab.ViewPort.on('scroll', function(){
-			///XXXX Se issue on blessed's github page
-			var NrOfScrollableLines = Tab.ViewPort.getScrollHeight() - Tab.ViewPort.height;
-			var BlessLinesY = Math.round(NrOfScrollableLines*(Tab.ViewPort.getScrollPerc()/100));
+			var BlessLinesY = BlessGetScroll(Tab.ViewPort);
 			Tab.LastViewPortScroll = terminalConverter.getBrowserY(BlessLinesY);
 			Tab.PhantomTab.set('scrollPosition', {top:Tab.LastViewPortScroll,left:0});
 		});
@@ -518,6 +529,10 @@ function TREErender(Tab, OnDone){
 		var ZindexMap = [];
         var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
 
+			var DrawBox = false;
+			if(Element.BgColor){
+				DrawBox = true;
+			}
 
 			if(typeof(Element.Ladder) != 'undefined'){
 				if(typeof(Tab.jsLadderIndex[Element.Ladder]) != 'undefined' && Tab.jsLadderIndex[Element.Ladder].length != 0){
@@ -545,7 +560,7 @@ function TREErender(Tab, OnDone){
 			if(typeof(Element.DomNode) != 'undefined'){
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
 					BlessStyle.bg = Element.DomNode.StyleObj.bg;
-					Element.BgColor = true;
+					DrawBox = true;
 				}else if(typeof(Element.DomNode.backgroundImage) != 'undefined'){
 					Element.BgImage = Element.DomNode.backgroundImage;
 				}
@@ -563,28 +578,13 @@ function TREErender(Tab, OnDone){
 			var BlessOwner = Tab.ViewPort;
 			
 			var PosRelativeTo = [0,0];
-			var ClosestLayerOwner = findOwner(Element._owner, 'ZIndex', true);
-			if(ClosestLayerOwner){
+			var ClosestLayerOwner = findOwner(Element._owner, 'Layer', true);
+			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
+				DrawBox = true;
 				PosRelativeTo = ClosestLayerOwner.Pos;
 				BlessOwner = ClosestLayerOwner.blessBox;
 			}
 			
-			if(typeof(BlessStyle.bg) == 'undefined'){
-				var ClosestOwnerWithBg = findOwner(Element, 'bg');
-				if(ClosestOwnerWithBg){
-					BlessStyle.bg = ClosestOwnerWithBg.Inheritable.bg;
-				}else{
-					BlessStyle.bg = PageDefaultColorValues.bgcolor;
-				}
-			}
-			if(typeof(BlessStyle.fg) == 'undefined'){
-				var ClosestOwnerWithFg = findOwner(Element, 'fg');
-				if(ClosestOwnerWithFg){
-					BlessStyle.fg = ClosestOwnerWithFg.Inheritable.fg;
-				}else{
-					BlessStyle.fg = PageDefaultColorValues.color;
-				}
-			}
 			
 
 			var BlesSettings = {
@@ -624,55 +624,82 @@ function TREErender(Tab, OnDone){
 			
 			//I would like to convert images to assci drawings
 			if(Element.Type == "RenderImage"){
-				Element.BgColor = true;
+				DrawBox = true;
 				SpecialType = Element.ElemType;
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
 			//Background images cause more problems than they solve so they are inactivated
 			if(false && typeof(Element.BgImage) != 'undefined'){
-				Element.BgColor = true;
+				DrawBox = true;
 				SpecialType = Element.ElemType;
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
 			//We dont render SVG i would ihowever like to render them as images
 			if(Element.Type == "RenderSVGRoot"){
-				Element.BgColor = true;
+				DrawBox = true;
 				SpecialType = Element.ElemType;
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
 			//We dont render Iframes cause it would require more work
 			if(Element.Type == "RenderPartObject"){
-				Element.BgColor = true;
+				DrawBox = true;
 				SpecialType = Element.ElemType;
 				BlessStyle.bg = "#7f7f7f";
 				BlessStyle.fg = "#000000";
 			}
 			//we need to render elements that has ZIndex so that they get a blessbox that their kids can attach to
 			if(typeof(Element.ZIndex) != 'undefined'){
-				Element.BgColor = true;
+				//DrawBox = true;
 				if(typeof(BlessStyle.bg) == 'undefined'){
-					BlessStyle.bg = "#7f7f7f";
+					//BlessStyle.bg = "#7f7f7f";
 				}
 			}
 
 			//Save Inheritable properties
-			if(typeof(BlessStyle.bg) != 'undefined'){
-				Element.Inheritable.bg = BlessStyle.bg;
-			}
 			/*if(typeof(Element.ZIndex) != 'undefined'){
 				Element.Inheritable.ZIndex = Element.ZIndex;
 			}*/
-			if(typeof(BlessStyle.fg) != 'undefined'){
-				Element.Inheritable.fg = BlessStyle.fg;
+			var DbugTxt = "Self";
+			//Inherit bg from closest owner
+			if(typeof(BlessStyle.bg) == 'undefined'){
+				var ClosestOwnerWithBg = findOwner(Element, 'bg');
+				if(ClosestOwnerWithBg){
+					BlessStyle.bg = ClosestOwnerWithBg.Inheritable.bg;
+					DbugTxt = ClosestOwnerWithBg._id+"="+ClosestOwnerWithBg.ElemType;
+				}else{
+					BlessStyle.bg = PageDefaultColorValues.bgcolor;
+				}
+			}else{
+				if(typeof(BlessStyle.bg) != 'undefined'){
+					Element.Inheritable.bg = BlessStyle.bg;
+				}
+			}
+			//Inherit fg from closest owner
+			if(typeof(BlessStyle.fg) == 'undefined'){
+				var ClosestOwnerWithFg = findOwner(Element, 'fg');
+				if(ClosestOwnerWithFg){
+					BlessStyle.fg = ClosestOwnerWithFg.Inheritable.fg;
+				}else{
+					BlessStyle.fg = PageDefaultColorValues.color;
+				}
+			}else{
+				if(typeof(BlessStyle.fg) != 'undefined'){
+					Element.Inheritable.fg = BlessStyle.fg;
+				}
+			}
+			//Layers will always draw a background so anything inside a layer will get to inherit it
+			if(typeof(Element.Layer) != 'undefined' && DrawBox){
+				//BlessStyle.bg = "blue";
+				//Element.Inheritable.bg = BlessStyle.bg;
 			}
 			
 			//Create blessed elements
             if(typeof(Element.Text) == "undefined"){
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
-                if(Element.BgColor && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
+                if(DrawBox && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
 					DebugElementTypes.indexOf(Element.ElemType) == -1){
 					
                     var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
@@ -763,7 +790,12 @@ function ShowRenderTree(Tree){
 		for(var k=0;Tree[Num].Indention>k;k++){
 			Indent += "  ";
 		}
-		console.log(Indent, Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where, "->", Tree[Num].childLayer);
+		var hLay = '';
+		if(typeof(Tree[Num].Layer) != 'undefined'){
+			hLay = 'hasLayer';
+		}
+		console.log(Indent, Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where,
+"->", hLay);
 		//console.log(Indent, Tree[Num].What, "at", Tree[Num].Where);
 		if(Tree[Num].children && Tree[Num].children.length != 0){
 			ShowRenderTree(Tree[Num].children);
@@ -962,6 +994,22 @@ function PreDump(S, cache, cacheInfo, road){
         road.pop(key);
     }
     return(Dp);
+}
+
+function BlessGetScroll(Box){
+	return(Box.childBase);
+}
+function BlessChangeScroll(Lines, Box){
+	Box.setScroll(Box.childBase+Box.childOffset+Lines)
+	
+	//var NrOfScrollableLines = Box.getScrollHeight();// - Box.height;
+	//var PercentChange = Lines/NrOfScrollableLines;
+	//('Lines', Lines, 'Tot', NrOfScrollableLines, 'He', Box.height, 'PercentChange', PercentChange)
+	//sysEvents.OnPhantomNotice("Before", "InArea", Box.getScrollHeight(), 'Scroll', Lines, 'CurrScroll', Box.getScroll(), 'Perc', Box.getScrollPerc(),'Chnage', PercentChange, 'childBase', Box.childBase,'childOffset', Box.childOffset);
+	//Box.scroll(Lines);
+	//Box.setScrollPerc(((Box.getScrollPerc()/100)+PercentChange) * 100)
+	//Box.childBase = 0;
+	//sysEvents.OnPhantomNotice("After", "InArea", Box.getScrollHeight(), 'Scroll', Lines, 'CurrScroll', Box.getScroll(), 'Perc', Box.getScrollPerc(), 'childBase', Box.childBase,'childOffset', Box.childOffset);
 }
 
 function dump(In){
