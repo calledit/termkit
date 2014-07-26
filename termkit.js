@@ -26,10 +26,10 @@ var StyleConfig = {
 
 var settings = {
 	ScrollMultiplier: 0.5,
-    //HomePage: "http://www.svt.se/"
+    HomePage: "http://www.svt.se/"
     //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    HomePage: "https://news.ycombinator.com/"
+    //HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -140,13 +140,13 @@ screen.key(['C-r'], function(ch, key) {
 });
 
 screen.key(['down'], function(ch, key) {//PgUp
-	BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+	BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
 screen.key(['up'], function(ch, key) {//PgDown
-	BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
+	BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
 screen.key(['backspace'], function(ch, key) {
@@ -590,8 +590,8 @@ function TREErender(Tab, OnDone){
 			var ClosestLayerOwner = findOwner(Element._owner, 'Layer', true);
 			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
 				DrawBox = true;
-				//PosRelativeTo = ClosestLayerOwner.Pos;
-				//BlessOwner = ClosestLayerOwner.blessBox;
+				PosRelativeTo = ClosestLayerOwner.Pos;
+				BlessOwner = ClosestLayerOwner.blessBox;
 			}
 			
 			
@@ -604,9 +604,6 @@ function TREErender(Tab, OnDone){
 				//fixed: true,
 				//childBase: 0
 			};
-			if(!BlessOwner.scrollable){
-				//BlesSettings.fixed = true;
-			}
 
 			if(SelectebleElementTypes.indexOf(Element.ElemType) != -1){
 				Tab.SelectebleElements.push(Element._id)
