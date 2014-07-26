@@ -1,5 +1,5 @@
 diff --git a/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp b/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
-index 9709838..0c2ac67 100644
+index 9709838..88c4972 100644
 --- a/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
 +++ b/src/qt/src/3rdparty/webkit/Source/WebCore/rendering/RenderTreeAsText.cpp
 @@ -244,35 +244,7 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o,
@@ -39,16 +39,32 @@ index 9709838..0c2ac67 100644
      ts << " " << r;
  
      if (!(o.isText() && !o.isBR())) {
-@@ -566,8 +538,6 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
-     }
+@@ -567,23 +539,9 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
  
      for (RenderObject* child = o.firstChild(); child; child = child->nextSibling()) {
--        if (child->hasLayer())
+         if (child->hasLayer())
 -            continue;
++            ts << "haslayer";
          write(ts, *child, indent + 1, behavior);
      }
+-
+-    if (o.isWidget()) {
+-        Widget* widget = toRenderWidget(&o)->widget();
+-        if (widget && widget->isFrameView()) {
+-            FrameView* view = static_cast<FrameView*>(widget);
+-            RenderView* root = view->frame()->contentRenderer();
+-            if (root) {
+-                view->layout();
+-                RenderLayer* l = root->layer();
+-                if (l)
+-                    writeLayers(ts, l, l, IntRect(l->x(), l->y(), l->width(), l->height()), indent + 1, behavior);
+-            }
+-        }
+-    }
+ }
  
-@@ -671,41 +641,9 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
+ enum LayerPaintPhase {
+@@ -671,41 +629,9 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
      if (shouldPaint && paintsBackgroundSeparately)
          write(ts, *l, layerBounds, damageRect, clipRectToApply, outlineRect, LayerPaintPhaseBackground, indent, behavior);
  
