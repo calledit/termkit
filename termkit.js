@@ -26,10 +26,11 @@ var StyleConfig = {
 
 var settings = {
 	ScrollMultiplier: 0.5,
-    HomePage: "http://www.svt.se/"
+    //HomePage: "http://www.svt.se/"
+    //HomePage: "https://github.com/callesg/termkit"
     //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    //HomePage: "https://news.ycombinator.com/"
+    HomePage: "https://news.ycombinator.com/"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -139,16 +140,21 @@ screen.key(['C-r'], function(ch, key) {
     });
 });
 
-screen.key(['down'], function(ch, key) {//PgUp
-	//BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
+screen.key(['pageup'], function(ch, key) {//PgUp
+	BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
-screen.key(['up'], function(ch, key) {//PgDown
-	//BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
+screen.key(['pagedown'], function(ch, key) {//PgDown
+	BlessChangeScroll(Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
+
+//Debug find key name
+/*screen.on('keypress', function(ch, key) {
+	console.log('ch', ch, 'key', key)
+});*/
 screen.key(['backspace'], function(ch, key) {
 	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
 	
@@ -621,9 +627,6 @@ function TREErender(Tab, OnDone){
 					BlessStyle.underline = true;
 				}
 			}
-			if(typeof(Element.Inheritable.ZIndex) != 'undefined'){
-				//Element.ZIndex = Element.Inheritable.ZIndex;
-			}
 			if(typeof(Element.ZIndex) != 'undefined'){
 				if(typeof(ZindexMap[Element.ZIndex]) == 'undefined'){
 					ZindexMap[Element.ZIndex] = [];
@@ -665,16 +668,13 @@ function TREErender(Tab, OnDone){
 			}
 			//we need to render elements that has ZIndex so that they get a blessbox that their kids can attach to
 			if(typeof(Element.ZIndex) != 'undefined'){
-				//DrawBox = true;
-				if(typeof(BlessStyle.bg) == 'undefined'){
-					//BlessStyle.bg = "#7f7f7f";
-				}
+				DrawBox = true;
+				/*if(typeof(BlessStyle.bg) == 'undefined'){
+					BlessStyle.bg = "#7f7f7f";
+				}*/
 			}
 
 			//Save Inheritable properties
-			/*if(typeof(Element.ZIndex) != 'undefined'){
-				Element.Inheritable.ZIndex = Element.ZIndex;
-			}*/
 			var DbugTxt = "Self";
 			//Inherit bg from closest owner
 			if(typeof(BlessStyle.bg) == 'undefined'){
@@ -782,7 +782,7 @@ function TREErender(Tab, OnDone){
 			for(var num in ZindexMap[ZIndex]){
 				var backNum = ElLen-num;
 				if(ZindexMap[ZIndex][backNum].blessBox){
-					//ZindexMap[ZIndex][backNum].blessBox.setFront()
+					ZindexMap[ZIndex][backNum].blessBox.setFront()
 				}
 			}
 		}
