@@ -1,5 +1,6 @@
 var blessed = require('blessed'),
     phantom = require('phantom');
+    wcwidth = require('wcwidth')
 var render_parser = require('./parse_rendertree.js');
 
 var screen = blessed.screen();
@@ -32,6 +33,7 @@ var settings = {
     //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
     HomePage: "https://news.ycombinator.com/"
+    //HomePage: "http://en.wikipedia.org/wiki/Portal:Featured_content"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -790,7 +792,8 @@ function TREErender(Tab, OnDone){
 				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
 				//BlesSettings.width = Element.Text.length;
 				BlesSettings.height = 1;
-				BlesSettings.content = Element.Text.substr(0, CalcWidth);
+				//console.log(Element.Where)
+				BlesSettings.content = TruncUnicode(Element.Text).substr(0, CalcWidth);
 				if(Element.Text.indexOf('Trailer') != -1){
 					//dump(Element);
 					//dbgclear();
@@ -1091,6 +1094,37 @@ function dump(In){
 	}, 4));
     //console.log(JSON.stringify(In, null, 4));
     //console.log(JSON.stringify(PreDump(In), null, 4));
+}
+function TruncUnicode(Text){
+	//XXXXXXXXX Make a patch for blessed 
+	var JavascriptLen = Text.length;
+	var PrintedWidth = wcwidth(Text);
+	if(PrintedWidth == JavascriptLen){
+		return(Text);
+	}
+	var RetText = ""
+	if(true || PrintedWidth > JavascriptLen){
+		for(var k=0;PrintedWidth>k;k++){
+			//console.log(wcwidth(Text[k]), Text[k]);
+			RetText += "?";
+		}
+		return(RetText);
+	}
+/*
+	for(var i=0;i<Text.length;i++){
+		if(wcwidth(RetText) > 1){
+			RetText += "?";
+			//console.log(Text[i], unicodeWidth.width(Text[i]))
+		}else{
+			RetText += Text[i];
+		}
+	}
+*/
+	/*while(WantedLength < unicodeWidth.width(RetText)){
+		RetText += Text.substr(0,1);
+		Text = Text.substr(1);
+	}*/
+	return(RetText);
 }
 function dbgclear(){
 	for(var k=0;screen.height*2>k;k++){
