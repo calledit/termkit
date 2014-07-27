@@ -26,6 +26,7 @@ var StyleConfig = {
 
 var settings = {
 	ScrollMultiplier: 0.5,
+	DefaultFontFix: true,
     //HomePage: "http://www.svt.se/"
     //HomePage: "https://github.com/callesg/termkit"
     //HomePage: "https://www.youtube.com/"
@@ -324,7 +325,7 @@ var BrowserActions = {
         Tab.AlterTextSizeBox = blessed.Checkbox({
             parent: Tab.BarForm,
             mouse: true,
-			checked: true,
+			checked: settings.DefaultFontFix,
             left: '85%',
             top: 0,
             width:  13,
@@ -530,6 +531,13 @@ var SelectebleElementTypes = [
 	"INPUT",
 	"BUTTON",
 ];
+//Element.Text != "." && Element.Text != String.fromCharCode(8204) && Element.Text != " "){
+var ForbidenStrings = [
+	"",
+	String.fromCharCode(8203),//ZERO WIDTH SPACE
+	String.fromCharCode(8204),//ZERO WIDTH NON-JOINER
+	String.fromCharCode(8205),//ZERO WIDTH JOINER
+];
 
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
@@ -573,6 +581,9 @@ function TREErender(Tab, OnDone){
 				fg: Element.Attrs.color
 			};
 			if(typeof(Element.DomNode) != 'undefined'){
+				if(Element.DomNode.hidden){
+					Element.Hidden = true;
+				}
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
 					BlessStyle.bg = Element.DomNode.StyleObj.bg;
 					DrawBox = true;
@@ -591,15 +602,43 @@ function TREErender(Tab, OnDone){
 
 			Element.Inheritable = {};
 			var BlessOwner = RootBless;
-			
+			var LayerIsVisible = false;
 			var PosRelativeTo = [0,0];
-			var ClosestLayerOwner = findOwner(Element._owner, 'Layer', true);
+			/*
+			var ClosestLayerOwner = Element;
+			while(ClosestLayerOwner = findOwner(ClosestLayerOwner._owner, 'Layer', true)){
+				if(typeof(ClosestLayerOwner.blessBox) != 'undefined'){
+					if(ClosestLayerOwner.Size[0] != 0 && ClosestLayerOwner[1] != 0){
+						DrawBox = true;
+						PosRelativeTo = ClosestLayerOwner.Pos;
+						BlessOwner = ClosestLayerOwner.blessBox;
+						break;
+					}else{
+						LayerIsVisible = false;
+					}
+				}
+			}*/
+			if(typeof(Element.Layer) != 'undefined'){
+				if(Element.Size[0] != 0 && Element.Size[1] != 0){
+					Element.VisibleLayer = Element.Layer;
+				}
+			}
+			var IsHidden = findOwner(Element, 'Hidden', true);
+			if(IsHidden){
+				return;
+			}
+			
+			var ClosestLayerOwner = findOwner(Element._owner, 'VisibleLayer', true);
+			if(ClosestLayerOwner){
+				LayerIsVisible = true;
+			}else{
+			
+			}
 			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
 				DrawBox = true;
 				PosRelativeTo = ClosestLayerOwner.Pos;
 				BlessOwner = ClosestLayerOwner.blessBox;
 			}
-			
 			
 
 			var BlesSettings = {
@@ -704,7 +743,7 @@ function TREErender(Tab, OnDone){
 				}
 			}
 			//Layers will always draw a background so anything inside a layer will get to inherit it
-			if(typeof(Element.Layer) != 'undefined' && DrawBox){
+			if(typeof(Element.VisibleLayer) != 'undefined' && DrawBox){
 				//BlessStyle.bg = "blue";
 				//Element.Inheritable.bg = BlessStyle.bg;
 			}
@@ -737,13 +776,25 @@ function TREErender(Tab, OnDone){
 				}else{
 					//console.log("Not a rendereble element:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
-            }else{
+            }else if(LayerIsVisible && ForbidenStrings.indexOf(Element.Text.trim()) == -1){
                 var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
 				BlesSettings.left = TermPos.left;
 				BlesSettings.top = TermPos.top;
-				BlesSettings.width = Element.Text.length;
+				BlesSettings.noOverflow = true;
+				
+				var ToldWidth = terminalConverter.getTerminalX(Element.TextWidth);
+				var ParentWidth = terminalConverter.getTerminalX(Element.Size[0]);
+				var CappedWidth = Math.min(ToldWidth, ParentWidth,  Element.Text.length);
+				var CalcWidth = Math.max(CappedWidth, 0);
+				BlesSettings.width = CalcWidth;
+				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
+				//BlesSettings.width = Element.Text.length;
 				BlesSettings.height = 1;
-				BlesSettings.content = Element.Text;
+				BlesSettings.content = Element.Text.substr(0, CalcWidth);
+				if(Element.Text.indexOf('Trailer') != -1){
+					//dump(Element);
+					//dbgclear();
+				}
 				
 				Element.blessBox = blessed.box(BlesSettings);
             }
@@ -842,6 +893,9 @@ function JSdomInfo(Tab, OnDone){
             if(Cstyle.backgroundImage != 'none'){
               IntrestingBox = true;
               BgImage = Cstyle.backgroundImage;
+            }
+            if(Cstyle.visibility == 'hidden'){
+				RetObj.hidden = true;
             }
             if(Cstyle.backgroundColor == 'rgba(0, 0, 0, 0)' && BgImage){
               //delete StyleValues.backgroundColor;
@@ -1029,7 +1083,13 @@ function BlessChangeScroll(Lines, Box){
 }
 
 function dump(In){
-    console.log(JSON.stringify(In, null, 4));
+    console.log(JSON.stringify(In, function (k, v){
+		if(k == "_owner"){
+			return null;
+		}
+		return(v);
+	}, 4));
+    //console.log(JSON.stringify(In, null, 4));
     //console.log(JSON.stringify(PreDump(In), null, 4));
 }
 function dbgclear(){
