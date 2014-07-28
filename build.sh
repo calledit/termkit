@@ -29,8 +29,8 @@ git clone https://github.com/ariya/phantomjs.git
 cd phantomjs
 #Apply patch to phantomjs and webkit
 git apply ../termkit/renderTreeDump.patch
-#build phantomjs
-./build.sh
+#build phantomjs get it a bit more silent and speed up the compiling by running in paralel 32 threds is fine as the build is IO bound not cpu
+./build.sh --confirm --silent --jobs 32
 
 #Move the binary in to place
 mv bin/phantomjs ../termkit/patched_phantomjs
