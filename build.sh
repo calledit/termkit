@@ -9,7 +9,7 @@
 
 #Install js modules
 #the master branch of blessed has some horible bugs so we use git directly to get a fork with out those bugs. When resolved use: npm install phantom blessed
-npm install phantom
+npm install phantom wcwidth
 NpmResult=$?
 if [ "${NpmResult}" != "0" ] 
 then
