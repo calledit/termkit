@@ -135,6 +135,8 @@ terminalConverter.getBrowserSize();
 var Tabs = [];
 
 screen.key(['C-r'], function(ch, key) {
+	
+	//clear screen so that the user can sa there has been a refresh
 	BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
 	screen.render();
 	
@@ -224,6 +226,10 @@ phantom.create({
 var BrowserActions = {
 	clearTab: function(Tab){
 		var Kids = [];
+		Tab.ViewPort.focus();
+		Tab.ViewPort._children = false;
+		//Tab.ViewPort._refresh();
+		Tab.ViewPort.setText("");
 		for(var cid in Tab.ViewPort.children){
 			Kids.push(Tab.ViewPort.children[cid]);
 		}
@@ -355,9 +361,10 @@ var BrowserActions = {
 			});
 		});
 		
-        Tab.ViewPort = blessed.box({
+        Tab.ViewPort = blessed.Form({
             parent: ViewPort,
             mouse: true,
+            keys: true,
             scrollable: true,
 			alwaysScroll: true,
 			//noOverflow:true,
@@ -401,7 +408,6 @@ var BrowserActions = {
 						Tab.ViewPort.setText("Error when loading page: "+status);
 						screen.render();
 					}else{
-						Tab.ViewPort.setText("");
 						BrowserActions.clearTab(Tab)
 						Tab.ViewPort.style.bg = StyleConfig.DefaultTabBgColor;
 						screen.render();
@@ -462,12 +468,15 @@ var BrowserActions = {
 
 function renderTab(Tab, OnDone){
     
+	//Reset Focus before removing elements
+	//Tab.ViewPort.focusFirst();
     //Remove old children from previus render this may not be so good as we
     //will loose stuff like input state when doing it
-    for(childId in Tab.ViewPort.children){
+    /*for(childId in Tab.ViewPort.children){
         Tab.ViewPort.remove(Tab.ViewPort.children[childId]);
         delete Tab.ViewPort.children[childId];
-    }
+    }*/
+	BrowserActions.clearTab(Tab);
 
 
 	//Tab.PhantomTab.evaluate(DbgShowMouseClicks,function(){});//For debuging mouse cliking of elements in webkit
@@ -653,8 +662,9 @@ function TREErender(Tab, OnDone){
 			};
 
 			if(SelectebleElementTypes.indexOf(Element.ElemType) != -1){
-				Tab.SelectebleElements.push(Element._id)
-				Element.Selecteble_id = Element._id;
+				Tab.SelectebleElements.push(Element)
+				DrawBox = true;
+				Element.Selecteble_id = Tab.SelectebleElements.length-1;
 			}else{
 				if(Element._owner && Element._owner.Selecteble_id){
 					Element.Selecteble_id = Element._owner.Selecteble_id;
@@ -749,7 +759,7 @@ function TREErender(Tab, OnDone){
 				//BlessStyle.bg = "blue";
 				//Element.Inheritable.bg = BlessStyle.bg;
 			}
-			
+			var UsedBSettings = false;
 			//Create blessed elements
             if(typeof(Element.Text) == "undefined"){
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
@@ -768,7 +778,7 @@ function TREErender(Tab, OnDone){
 							BlesSettings.valign = 'middle';
 							BlesSettings.align = 'center';
 						}
-						Element.blessBox = blessed.box(BlesSettings);
+						UsedBSettings = BlesSettings;
 						if(typeof(Element.ZIndex) != 'undefined'){
 							//Element.blessBox.setIndex(Element.ZIndex);
 						}
@@ -799,34 +809,59 @@ function TREErender(Tab, OnDone){
 					//dbgclear();
 				}
 				
-				Element.blessBox = blessed.box(BlesSettings);
+				UsedBSettings = BlesSettings;
             }
-			if(BlesSettings.clickable && Element.blessBox){
-				Element.blessBox.on('click', function(mouse){
-					BrowserActions.clearTab(Tab)
-					Tab.ViewPort.style.bg = '#e86b55';
+			
+			//Now that we have most of the grapical stuff create our blessed obj
+			if(UsedBSettings){
+				if(UsedBSettings.clickable){
 					
-					//Figure out where the midle of the element is so we can send a click event to webkit 
-					var ClickX = Element.Pos[0];
-					var ClickY = Element.Pos[1];
-					//sysEvents.OnTermkitNotice("cliked object pos: "+(ClickX)+"x"+(ClickY));//Where did we click
-					ClickY -= Tab.LastViewPortScroll;
-					//sysEvents.OnTermkitNotice("Adjusted for Tab.LastViewPortScroll: "+(ClickY));//Where did we click
-					var InheritSize = findOwner(Element, 'Size', true);
-					if(InheritSize){
-						//sysEvents.OnTermkitNotice("Outside Owner Size:", InheritSize.Size[0], InheritSize.Size[1]);//If clicking does not work
-						if(typeof(Element.TextWidth) != 'undefined'){
-							ClickX += Math.round(Element.TextWidth/2);
-						}else{
-							ClickX += Math.round(InheritSize.Size[0]/2);
-						}
-						ClickY += Math.round(InheritSize.Size[1]/2);
+					BlessStyle.focus = {
+						'fg': StyleConfig.InputFgColor,
+						'bg': StyleConfig.InputFocusBgColor,
+					};
+					BlessStyle.hover = {
+						'bg': StyleConfig.InputHoverBgColor
+					};
+					//If it is the actual element we care about Or if the actual element was unprinted
+					if(Tab.SelectebleElements[Element.Selecteble_id] === Element || !Tab.SelectebleElements[Element.Selecteble_id].blessBox){
+						Element.blessBox = blessed.Button(UsedBSettings);
+						Element.blessBox.on('press',
+						function(mouse){
+							//BrowserActions.clearTab(Tab)
+							//Tab.ViewPort.style.bg = '#e86b55';
+							var ClickOwner = Tab.SelectebleElements[Element.Selecteble_id];
+							
+							//Figure out where the midle of the element is so we can send a click event to webkit 
+							var ClickX = ClickOwner.Pos[0];
+							var ClickY = ClickOwner.Pos[1];
+							//sysEvents.OnTermkitNotice("cliked object pos: "+(ClickX)+"x"+(ClickY));//Where did we click
+							ClickY -= Tab.LastViewPortScroll;
+							//sysEvents.OnTermkitNotice("Adjusted for Tab.LastViewPortScroll: "+(ClickY));//Where did we click
+							
+							//Pressed a pice of text
+							if(typeof(Element.TextWidth) != 'undefined'){
+									ClickX += Math.round(Element.TextWidth/2);
+									ClickY += Math.round(Element._owner.Size[1]/2);
+							}else{
+								var InheritSize = findOwner(ClickOwner, 'Size', true);
+								if(InheritSize){
+									ClickX += Math.round(InheritSize.Size[0]/2);
+									ClickY += Math.round(InheritSize.Size[1]/2);
+								}
+							}
+							
+							//sysEvents.OnTermkitNotice("cliking("+Element.ElemType+") at"+(ClickX)+"x"+(ClickY));//Where did we acctually click
+							Tab.PhantomTab.sendEvent('click', ClickX, ClickY);
+							//setTimeout(screen.render();
+						});
+					}else{
+						//A kid of a blessed clickable element 
+						Element.blessBox = blessed.box(UsedBSettings);
 					}
-					
-					//sysEvents.OnTermkitNotice("cliking("+Element.ElemType+") at"+(ClickX)+"x"+(ClickY));//Where did we acctually click
-					Tab.PhantomTab.sendEvent('click', ClickX, ClickY);
-					screen.render();
-				});
+				}else{//Not a clickable element
+					Element.blessBox = blessed.box(BlesSettings);
+				}
 			}
 
         });
@@ -843,6 +878,7 @@ function TREErender(Tab, OnDone){
 		//console.log(dumpText)
 		//dump(RenderTree);
 		Tab.LastRenderTree = RenderTree; 
+		//Tab.ViewPort._refresh();
 		//ShowRenderTree(RenderTree);
 		//dbgclear();
 		//process.exit(1);
