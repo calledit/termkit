@@ -1,5 +1,6 @@
 var blessed = require('blessed'),
     phantom = require('phantom');
+    wcwidth = require('wcwidth')
 var render_parser = require('./parse_rendertree.js');
 
 var screen = blessed.screen();
@@ -26,10 +27,13 @@ var StyleConfig = {
 
 var settings = {
 	ScrollMultiplier: 0.5,
-    HomePage: "http://www.svt.se/"
+	DefaultFontFix: true,
+    //HomePage: "http://www.svt.se/"
+    //HomePage: "https://github.com/callesg/termkit"
     //HomePage: "https://www.youtube.com/"
     //HomePage: "https://www.facebook.com/"
-    //HomePage: "https://news.ycombinator.com/"
+    HomePage: "https://news.ycombinator.com/"
+    //HomePage: "http://en.wikipedia.org/wiki/Portal:Featured_content"
     //HomePage: "http://www.w3schools.com/jsref/jsref_indexof_array.asp"
     //HomePage: "https://www.webkit.org/blog/116/webcore-rendering-iii-layout-basics/"
 };
@@ -139,16 +143,21 @@ screen.key(['C-r'], function(ch, key) {
     });
 });
 
-screen.key(['down'], function(ch, key) {//PgUp
-	//BlessChangeScroll(settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
+screen.key(['pageup'], function(ch, key) {//PgUp
+	BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
-screen.key(['up'], function(ch, key) {//PgDown
-	//BlessChangeScroll(-settings.ScrollMultiplier*ViewPort.height, Tabs[termKitState.ActiveTab].ViewPort);
-	BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
+screen.key(['pagedown'], function(ch, key) {//PgDown
+	BlessChangeScroll(Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
     screen.render();//Manual scroll does not call render
 });
+
+//Debug find key name
+/*screen.on('keypress', function(ch, key) {
+	console.log('ch', ch, 'key', key)
+});*/
 screen.key(['backspace'], function(ch, key) {
 	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
 	
@@ -318,7 +327,7 @@ var BrowserActions = {
         Tab.AlterTextSizeBox = blessed.Checkbox({
             parent: Tab.BarForm,
             mouse: true,
-			checked: true,
+			checked: settings.DefaultFontFix,
             left: '85%',
             top: 0,
             width:  13,
@@ -524,6 +533,13 @@ var SelectebleElementTypes = [
 	"INPUT",
 	"BUTTON",
 ];
+//Element.Text != "." && Element.Text != String.fromCharCode(8204) && Element.Text != " "){
+var ForbidenStrings = [
+	"",
+	String.fromCharCode(8203),//ZERO WIDTH SPACE
+	String.fromCharCode(8204),//ZERO WIDTH NON-JOINER
+	String.fromCharCode(8205),//ZERO WIDTH JOINER
+];
 
 //Renders the page based on the focusedFrameRenderTreeDump
 function TREErender(Tab, OnDone){
@@ -567,6 +583,9 @@ function TREErender(Tab, OnDone){
 				fg: Element.Attrs.color
 			};
 			if(typeof(Element.DomNode) != 'undefined'){
+				if(Element.DomNode.hidden){
+					Element.Hidden = true;
+				}
 				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
 					BlessStyle.bg = Element.DomNode.StyleObj.bg;
 					DrawBox = true;
@@ -585,15 +604,43 @@ function TREErender(Tab, OnDone){
 
 			Element.Inheritable = {};
 			var BlessOwner = RootBless;
-			
+			var LayerIsVisible = false;
 			var PosRelativeTo = [0,0];
-			var ClosestLayerOwner = findOwner(Element._owner, 'Layer', true);
+			/*
+			var ClosestLayerOwner = Element;
+			while(ClosestLayerOwner = findOwner(ClosestLayerOwner._owner, 'Layer', true)){
+				if(typeof(ClosestLayerOwner.blessBox) != 'undefined'){
+					if(ClosestLayerOwner.Size[0] != 0 && ClosestLayerOwner[1] != 0){
+						DrawBox = true;
+						PosRelativeTo = ClosestLayerOwner.Pos;
+						BlessOwner = ClosestLayerOwner.blessBox;
+						break;
+					}else{
+						LayerIsVisible = false;
+					}
+				}
+			}*/
+			if(typeof(Element.Layer) != 'undefined'){
+				if(Element.Size[0] != 0 && Element.Size[1] != 0){
+					Element.VisibleLayer = Element.Layer;
+				}
+			}
+			var IsHidden = findOwner(Element, 'Hidden', true);
+			if(IsHidden){
+				return;
+			}
+			
+			var ClosestLayerOwner = findOwner(Element._owner, 'VisibleLayer', true);
+			if(ClosestLayerOwner){
+				LayerIsVisible = true;
+			}else{
+			
+			}
 			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
 				DrawBox = true;
 				PosRelativeTo = ClosestLayerOwner.Pos;
 				BlessOwner = ClosestLayerOwner.blessBox;
 			}
-			
 			
 
 			var BlesSettings = {
@@ -620,9 +667,6 @@ function TREErender(Tab, OnDone){
 				if(typeof(Element.Text) != "undefined"){
 					BlessStyle.underline = true;
 				}
-			}
-			if(typeof(Element.Inheritable.ZIndex) != 'undefined'){
-				//Element.ZIndex = Element.Inheritable.ZIndex;
 			}
 			if(typeof(Element.ZIndex) != 'undefined'){
 				if(typeof(ZindexMap[Element.ZIndex]) == 'undefined'){
@@ -665,16 +709,13 @@ function TREErender(Tab, OnDone){
 			}
 			//we need to render elements that has ZIndex so that they get a blessbox that their kids can attach to
 			if(typeof(Element.ZIndex) != 'undefined'){
-				//DrawBox = true;
-				if(typeof(BlessStyle.bg) == 'undefined'){
-					//BlessStyle.bg = "#7f7f7f";
-				}
+				DrawBox = true;
+				/*if(typeof(BlessStyle.bg) == 'undefined'){
+					BlessStyle.bg = "#7f7f7f";
+				}*/
 			}
 
 			//Save Inheritable properties
-			/*if(typeof(Element.ZIndex) != 'undefined'){
-				Element.Inheritable.ZIndex = Element.ZIndex;
-			}*/
 			var DbugTxt = "Self";
 			//Inherit bg from closest owner
 			if(typeof(BlessStyle.bg) == 'undefined'){
@@ -704,7 +745,7 @@ function TREErender(Tab, OnDone){
 				}
 			}
 			//Layers will always draw a background so anything inside a layer will get to inherit it
-			if(typeof(Element.Layer) != 'undefined' && DrawBox){
+			if(typeof(Element.VisibleLayer) != 'undefined' && DrawBox){
 				//BlessStyle.bg = "blue";
 				//Element.Inheritable.bg = BlessStyle.bg;
 			}
@@ -737,13 +778,26 @@ function TREErender(Tab, OnDone){
 				}else{
 					//console.log("Not a rendereble element:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
-            }else{
+            }else if(LayerIsVisible && ForbidenStrings.indexOf(Element.Text.trim()) == -1){
                 var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
 				BlesSettings.left = TermPos.left;
 				BlesSettings.top = TermPos.top;
-				BlesSettings.width = Element.Text.length;
+				BlesSettings.noOverflow = true;
+				
+				var ToldWidth = terminalConverter.getTerminalX(Element.TextWidth);
+				var ParentWidth = terminalConverter.getTerminalX(Element.Size[0]);
+				var CappedWidth = Math.min(ToldWidth, ParentWidth,  Element.Text.length);
+				var CalcWidth = Math.max(CappedWidth, 0);
+				BlesSettings.width = CalcWidth;
+				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
+				//BlesSettings.width = Element.Text.length;
 				BlesSettings.height = 1;
-				BlesSettings.content = Element.Text;
+				//console.log(Element.Where)
+				BlesSettings.content = TruncUnicode(Element.Text).substr(0, CalcWidth);
+				if(Element.Text.indexOf('Trailer') != -1){
+					//dump(Element);
+					//dbgclear();
+				}
 				
 				Element.blessBox = blessed.box(BlesSettings);
             }
@@ -782,7 +836,7 @@ function TREErender(Tab, OnDone){
 			for(var num in ZindexMap[ZIndex]){
 				var backNum = ElLen-num;
 				if(ZindexMap[ZIndex][backNum].blessBox){
-					//ZindexMap[ZIndex][backNum].blessBox.setFront()
+					ZindexMap[ZIndex][backNum].blessBox.setFront()
 				}
 			}
 		}
@@ -842,6 +896,9 @@ function JSdomInfo(Tab, OnDone){
             if(Cstyle.backgroundImage != 'none'){
               IntrestingBox = true;
               BgImage = Cstyle.backgroundImage;
+            }
+            if(Cstyle.visibility == 'hidden'){
+				RetObj.hidden = true;
             }
             if(Cstyle.backgroundColor == 'rgba(0, 0, 0, 0)' && BgImage){
               //delete StyleValues.backgroundColor;
@@ -1029,8 +1086,45 @@ function BlessChangeScroll(Lines, Box){
 }
 
 function dump(In){
-    console.log(JSON.stringify(In, null, 4));
+    console.log(JSON.stringify(In, function (k, v){
+		if(k == "_owner"){
+			return null;
+		}
+		return(v);
+	}, 4));
+    //console.log(JSON.stringify(In, null, 4));
     //console.log(JSON.stringify(PreDump(In), null, 4));
+}
+function TruncUnicode(Text){
+	//XXXXXXXXX Make a patch for blessed 
+	var JavascriptLen = Text.length;
+	var PrintedWidth = wcwidth(Text);
+	if(PrintedWidth == JavascriptLen){
+		return(Text);
+	}
+	var RetText = ""
+	if(true || PrintedWidth > JavascriptLen){
+		for(var k=0;PrintedWidth>k;k++){
+			//console.log(wcwidth(Text[k]), Text[k]);
+			RetText += "?";
+		}
+		return(RetText);
+	}
+/*
+	for(var i=0;i<Text.length;i++){
+		if(wcwidth(RetText) > 1){
+			RetText += "?";
+			//console.log(Text[i], unicodeWidth.width(Text[i]))
+		}else{
+			RetText += Text[i];
+		}
+	}
+*/
+	/*while(WantedLength < unicodeWidth.width(RetText)){
+		RetText += Text.substr(0,1);
+		Text = Text.substr(1);
+	}*/
+	return(RetText);
 }
 function dbgclear(){
 	for(var k=0;screen.height*2>k;k++){
