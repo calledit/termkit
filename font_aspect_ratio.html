@@ -1,0 +1,28 @@
+<html>
+	<head>
+		<title>Font Aspect Ratio</title>
+		<style>
+		#testletterholder{
+			float:left;
+		}
+		</style>
+	</head>
+	<body>
+		<div id="testletterholder">a</div>
+		
+		<script>
+		var FontSize = 12;
+		var div_holder = document.getElementById("testletterholder");
+		div_holder.style.fontFamily = "monaco";
+		div_holder.style.lineHeight = "1";
+		div_holder.style.fontSize = (FontSize*10)+"px";
+		setTimeout(function(){
+			HolderStyle =  window.getComputedStyle(div_holder, null);
+			var Width = HolderStyle.width.replace(/[^0-9]/g, "");
+			var Height = HolderStyle.height.replace(/[^0-9]/g, "");
+			var AspectRatio = Width/Height;
+			console.log(Width, Height, AspectRatio);
+		},10);
+		</script>
+	</body>
+</html>
