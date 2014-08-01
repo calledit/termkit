@@ -9,6 +9,9 @@
 	</head>
 	<body>
 		<div id="testletterholder">a</div>
+		<div style="clear:both;"></div>
+		<div>Aspect ratio is:</div>
+		<div id="test_result"></div>
 		
 		<script>
 		var FontSize = 12;
@@ -21,7 +24,7 @@
 			var Width = HolderStyle.width.replace(/[^0-9]/g, "");
 			var Height = HolderStyle.height.replace(/[^0-9]/g, "");
 			var AspectRatio = Width/Height;
-			console.log(Width, Height, AspectRatio);
+			document.getElementById("test_result").innerHTML =  AspectRatio;
 		},10);
 		</script>
 	</body>
