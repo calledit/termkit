@@ -163,12 +163,12 @@ screen.key(['pagedown'], function(ch, key) {//PgDown
 screen.key(['backspace'], function(ch, key) {
 	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
 	
-	BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
-	screen.render();
+	//BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
+	//screen.render();
 
-    renderTab(Tabs[termKitState.ActiveTab], function(){
-        screen.render();
-    });
+    //renderTab(Tabs[termKitState.ActiveTab], function(){
+        //screen.render();
+    //});
 });
 screen.on('resize', function(){
     ViewPort.height = screen.height - TopMenu.height - ConsoleBox.height;
@@ -850,7 +850,7 @@ function TREErender(Tab, OnDone){
 							//Pressed a pice of text
 							if(typeof(Element.TextWidth) != 'undefined'){
 									ClickX += Math.round(Element.TextWidth/2);
-									ClickY += Math.round(Element._owner.Size[1]/2);
+									ClickY += Math.round(terminalConverter.FontSize/2);//Element._owner.Size[1]/2);
 							}else{
 								var InheritSize = findOwner(ClickOwner, 'Size', true);
 								if(InheritSize){
