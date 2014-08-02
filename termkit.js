@@ -83,7 +83,7 @@ var ViewPort = blessed.box({
 
 var terminalConverter = {
     FontSize: 12,
-    FontAspectRatio: 0.57, //The messured asspec ratio of the font monaco, courier has 0.43
+    FontAspectRatio: 0.5833333, //The messured asspec ratio of the font monaco, courier has 0.43
     browserSize: {},
     getBrowserSize: function(){
         terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*ViewPort.width);
@@ -794,16 +794,24 @@ function TREErender(Tab, OnDone){
 				BlesSettings.top = TermPos.top;
 				BlesSettings.noOverflow = true;
 				
-				var ToldWidth = terminalConverter.getTerminalX(Element.TextWidth);
-				var ParentWidth = terminalConverter.getTerminalX(Element.Size[0]);
-				var CappedWidth = Math.min(ToldWidth, ParentWidth,  Element.Text.length);
-				var CalcWidth = Math.max(CappedWidth, 0);
+				var BrowserWidth = Element.TextWidth;
+				var PrintedCharWidth = wcwidth(Element.Text);
+
+				var CalcWidth = Math.max(PrintedCharWidth, 0);
+
+				var AvgCharWidth = BrowserWidth/PrintedCharWidth;
+				var AspRatio = AvgCharWidth/terminalConverter.FontSize;
+				sysEvents.OnTermkitNotice("BrowserWidth:", Element.TextWidth, 'PrintedCharWidth:', PrintedCharWidth, "AvgCharWidth:", AvgCharWidth, 'AspRatio:', AspRatio);
+				if(Math.round(AvgCharWidth) != AvgCharWidth){
+					sysEvents.OnTermkitNotice("Uneven widthText:", Element.Text);
+				}
+				terminalConverter.FontAspectRatio
 				BlesSettings.width = CalcWidth;
 				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
 				//BlesSettings.width = Element.Text.length;
 				BlesSettings.height = 1;
 				//console.log(Element.Where)
-				BlesSettings.content = TruncUnicode(Element.Text).substr(0, CalcWidth);
+				BlesSettings.content = TruncUnicode(Element.Text);
 				if(Element.Text.indexOf('Trailer') != -1){
 					//dump(Element);
 					//dbgclear();
