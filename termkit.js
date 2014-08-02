@@ -83,7 +83,7 @@ var ViewPort = blessed.box({
 
 var terminalConverter = {
     FontSize: 12,
-    FontAspectRatio: 0.5833333, //The messured asspec ratio of the font monaco, courier has 0.43
+    FontAspectRatio: 0.5833333, //The messured asspec ratio of the font //We use the Courier font as is is the most comon monospace font
     browserSize: {},
     getBrowserSize: function(){
         terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*ViewPort.width);
@@ -492,7 +492,7 @@ function renderTab(Tab, OnDone){
 			elems = document.body.getElementsByTagName("*");
 			for(i in elems){
 				if(elems[i].style){
-					elems[i].style.fontFamily = "monaco";
+					elems[i].style.fontFamily = "courier";
 					elems[i].style.lineHeight = "1";
 					elems[i].style.fontSize = "12px";
 					elems[i].style.verticalAlign = 'inherit';
@@ -799,13 +799,13 @@ function TREErender(Tab, OnDone){
 
 				var CalcWidth = Math.max(PrintedCharWidth, 0);
 
-				var AvgCharWidth = BrowserWidth/PrintedCharWidth;
-				var AspRatio = AvgCharWidth/terminalConverter.FontSize;
-				sysEvents.OnTermkitNotice("BrowserWidth:", Element.TextWidth, 'PrintedCharWidth:', PrintedCharWidth, "AvgCharWidth:", AvgCharWidth, 'AspRatio:', AspRatio);
-				if(Math.round(AvgCharWidth) != AvgCharWidth){
-					sysEvents.OnTermkitNotice("Uneven widthText:", Element.Text);
-				}
-				terminalConverter.FontAspectRatio
+				//var AvgCharWidth = BrowserWidth/PrintedCharWidth;
+				//var AspRatio = AvgCharWidth/terminalConverter.FontSize;
+				//sysEvents.OnTermkitNotice("BrowserWidth:", Element.TextWidth, 'PrintedCharWidth:', PrintedCharWidth, "AvgCharWidth:", AvgCharWidth, 'AspRatio:', AspRatio);
+				//if(Math.round(AvgCharWidth) != AvgCharWidth){
+					//sysEvents.OnTermkitNotice("Uneven widthText:", Element.Text);
+				//}
+				//terminalConverter.FontAspectRatio
 				BlesSettings.width = CalcWidth;
 				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
 				//BlesSettings.width = Element.Text.length;
