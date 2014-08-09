@@ -103,7 +103,7 @@ var terminalConverter = {
     },
     getTerminalY: function(browserY){
         return(Math.round(browserY/terminalConverter.FontSize));
-    },getTerminalPos: function(Pos, Size, BrowsPosRelativeTo){
+    },getTerminalPos: function(Pos, Size, BrowsPosRelativeTo, IsLayer){
 		var PosRelativeTo = [0,0];
         if(typeof(BrowsPosRelativeTo) != 'undefined'){
 			PosRelativeTo = [terminalConverter.getTerminalX(BrowsPosRelativeTo[0]), terminalConverter.getTerminalY(BrowsPosRelativeTo[1])];
@@ -125,7 +125,12 @@ var terminalConverter = {
         Rets.width = Rets.right - Rets.left;
         Rets.height = Rets.bottom - Rets.top;
         if(Rets.width <= 0 || Rets.height <= 0){
-            return(false);
+			if(IsLayer){
+				Rets.width = 0;
+				Rets.height = 0;
+			}else{
+				return(false);
+			}
         }
         return(Rets);
     }
@@ -630,6 +635,8 @@ function TREErender(Tab, OnDone){
 				}
 			}*/
 			if(typeof(Element.Layer) != 'undefined'){
+				//sysEvents.OnTermkitNotice("Layer:",Element.ElemType, Element._id)
+				//DrawBox = true;
 				if(Element.Size[0] != 0 && Element.Size[1] != 0){
 					Element.VisibleLayer = Element.Layer;
 				}
@@ -762,11 +769,18 @@ function TREErender(Tab, OnDone){
 			var UsedBSettings = false;
 			//Create blessed elements
             if(typeof(Element.Text) == "undefined"){
+                var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
+				if(TermPos === false){
+					//sysEvents.OnTermkitNotice("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
+					if(typeof(Element.Layer) != 'undefined'){
+						Element.Hidden = true;
+						DrawBox = false;
+					}
+				}
 				//Problems ocure when rendering stuff as it may overwrite its siblings children 
                 if(DrawBox && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
 					DebugElementTypes.indexOf(Element.ElemType) == -1){
 					
-                    var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
                     if(TermPos !== false){
 						BlesSettings.left = TermPos.left;
 						BlesSettings.top = TermPos.top;
@@ -774,17 +788,16 @@ function TREErender(Tab, OnDone){
 						BlesSettings.height = TermPos.height;
 						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
 						if(SpecialType != false){
-							BlesSettings.content = SpecialType;
-							BlesSettings.valign = 'middle';
-							BlesSettings.align = 'center';
+							//BlesSettings.content = SpecialType;
+							//BlesSettings.valign = 'middle';
+							//BlesSettings.align = 'center';
 						}
+						//BlesSettings.noOverflow = true;
 						UsedBSettings = BlesSettings;
 						if(typeof(Element.ZIndex) != 'undefined'){
 							//Element.blessBox.setIndex(Element.ZIndex);
 						}
-                    }else{
-						//console.log("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
-					}
+                    }
 				}else{
 					//console.log("Not a rendereble element:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
 				}
@@ -869,6 +882,10 @@ function TREErender(Tab, OnDone){
 					}
 				}else{//Not a clickable element
 					Element.blessBox = blessed.box(BlesSettings);
+				}
+				
+				if(SpecialType != false){
+					FillChecker(Element.blessBox);
 				}
 			}
 
@@ -1108,6 +1125,30 @@ function PreDump(S, cache, cacheInfo, road){
         road.pop(key);
     }
     return(Dp);
+}
+
+function FillChecker(Box){
+	var hi = Box.height;
+	var wi = Box.width;
+	for(var h=0;hi>h;h+=1){
+		var w = 0;
+		if(h%2){
+			w += 2;
+		}
+		for(;wi>w;w+=4){
+			blessed.box({
+				parent: Box,
+				top:h,
+				left:w,
+				height: 1,
+				width: 2,
+				style:{
+					bg: '#E3E3E3'
+				}
+			});
+		}
+	}
+	
 }
 
 function BlessGetScroll(Box){
