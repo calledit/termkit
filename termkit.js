@@ -1,11 +1,41 @@
+const CDP = require('chrome-remote-interface');
+var blessed = require('blessed');
+//var wcwidth = require('wcwidth');
+//
+/*
+CDP((client) => {
+    // extract domains
+    const {Network, Page} = client;
+    // setup handlers
+    Network.requestWillBeSent((params) => {
+        console.log(params.request.url);
+    });
+    Page.loadEventFired(() => {
+        client.close();
+    });
+    // enable events then start!
+    Promise.all([
+        Network.enable(),
+        Page.enable()
+    ]).then(() => {
+        return Page.navigate({url: 'https://github.com'});
+    }).catch((err) => {
+        console.error(err);
+        client.close();
+    });
+}).on('error', (err) => {
+    // cannot connect to the remote endpoint
+    console.error(err);
+});
+*/
+/*
 var blessed = require('blessed'),
     phantom = require('phantom');
-    wcwidth = require('wcwidth')
 var render_parser = require('./parse_rendertree.js');
-
+*/
 var screen = blessed.screen();
 
-
+//exit when user preses one of the quit keys
 screen.key(['escape', 'q', 'C-c'], function(ch, key) {
   return process.exit(0);
 });
@@ -139,6 +169,7 @@ terminalConverter.getBrowserSize();
 
 var Tabs = [];
 
+//User presses ctrl+r for a reload
 screen.key(['C-r'], function(ch, key) {
 	
 	//clear screen so that the user can sa there has been a refresh
@@ -149,16 +180,15 @@ screen.key(['C-r'], function(ch, key) {
         screen.render();
     });
 });
-
 screen.key(['pageup'], function(ch, key) {//PgUp
-	BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
 	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
-    screen.render();//Manual scroll does not call render
+    //screen.render();//Manual scroll does not call render
 });
 screen.key(['pagedown'], function(ch, key) {//PgDown
-	BlessChangeScroll(Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
+	//BlessChangeScroll(Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
 	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
-    screen.render();//Manual scroll does not call render
+    //screen.render();//Manual scroll does not call render
 });
 
 //Debug find key name
@@ -166,7 +196,7 @@ screen.key(['pagedown'], function(ch, key) {//PgDown
 	console.log('ch', ch, 'key', key)
 });*/
 screen.key(['backspace'], function(ch, key) {
-	Tabs[termKitState.ActiveTab].PhantomTab.goBack()
+	//Tabs[termKitState.ActiveTab].PhantomTab.goBack()
 	
 	//BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
 	//screen.render();
@@ -175,16 +205,18 @@ screen.key(['backspace'], function(ch, key) {
         //screen.render();
     //});
 });
+
 screen.on('resize', function(){
     ViewPort.height = screen.height - TopMenu.height - ConsoleBox.height;
     terminalConverter.getBrowserSize();
+/*
     for(tbid in Tabs){
         Tabs[tbid].PhantomTab.set('viewportSize', terminalConverter.browserSize);
         renderTab(Tabs[tbid], function(){
             screen.render();
         });
     }
-    
+  */  
 });
 
 var phantomProccess = null;
@@ -211,6 +243,7 @@ var sysEvents = {
 };
 
 
+/*
 phantom.create({
         binary: "./patched_phantomjs",
         //binary: "./phantomjs",
@@ -227,6 +260,9 @@ phantom.create({
     phantomProccess = phant;
     sysEvents.OnPhantomLoaded();
 });
+*/
+
+screen.render();
 
 var BrowserActions = {
 	clearTab: function(Tab){
@@ -392,6 +428,7 @@ var BrowserActions = {
 
         
         //Get A tab from phantom 
+        /*
         phantomProccess.createPage(function(PTab){
             Tab.PhantomTab = PTab;
 			Tab.IsLoading = false;
@@ -431,17 +468,6 @@ var BrowserActions = {
 			Tab.PhantomTab.set('onAlert', function(msg) {
 				sysEvents.OnPhantomNotice(msg);
             });
-
-            /*Causes phanthom to crach
-			Tab.PhantomTab.set('onConsoleMessage', function(msg, lineNum, sourceId) {
-				console.log(msg);
-            });*/
-
-            /*Causes Phantom to crach
-			Tab.PhantomTab.set('onError', function(msg) {
-				sysEvents.OnPhantomNotice(msg)
-			});*/
-
             
             Tab.PhantomTab.set('viewportSize', terminalConverter.browserSize);
             
@@ -467,9 +493,11 @@ var BrowserActions = {
                 Tab.BarUrlInput.focus();
             }
         });
-
+		*/
     }
 };
+
+sysEvents.OnPhantomLoaded();
 
 function renderTab(Tab, OnDone){
     
@@ -554,382 +582,6 @@ var ForbidenStrings = [
 	String.fromCharCode(8204),//ZERO WIDTH NON-JOINER
 	String.fromCharCode(8205),//ZERO WIDTH JOINER
 ];
-
-//Renders the page based on the focusedFrameRenderTreeDump
-function TREErender(Tab, OnDone){
-    var testRet = Tab.PhantomTab.get('focusedFrameRenderTreeDump', function(dumpText){
-		//console.log(dumpText)
-		//process.exit(1);
-		var HasStartedAdding = false;
-		var ZindexMap = [];
-		var RootBless = Tab.ViewPort;/*blessed.Box({
-			parent:Tab.ViewPort,
-			shrink: true,
-		});*/
-        var RenderTree = render_parser(dumpText, {color: StyleConfig.DefaultTabFgColor, bgcolor: StyleConfig.DefaultTabBgColor}, function(Element, PageDefaultColorValues){
-
-			var DrawBox = false;
-			if(Element.BgColor){
-				DrawBox = true;
-			}
-
-			if(typeof(Element.Ladder) != 'undefined'){
-				if(typeof(Tab.jsLadderIndex[Element.Ladder]) != 'undefined' && Tab.jsLadderIndex[Element.Ladder].length != 0){
-					Element.DomNode = Tab.jsLadderIndex[Element.Ladder].shift();
-				}else{
-					//We dont render iframes as that would require us to get
-					//a new dom tree and there is problem with owerflow and
-					//other things it is not imposible to fix but iframes is
-					//generaly only used for ads (and comments) these days.
-					if(Element.Ladder.indexOf("IFRAME") != -1){
-						return;
-					}
-					//Ignore svg stuff
-					if(Element.Ladder.indexOf("svg") != -1){
-						return;
-					}
-					//console.error("Found no dom Node for render tree element it is probably a inline text box:",Element.Ladder);
-				}
-			}
-			
-			var BlessStyle = {
-				bg: Element.Attrs.bgcolor,
-				fg: Element.Attrs.color
-			};
-			if(typeof(Element.DomNode) != 'undefined'){
-				if(Element.DomNode.hidden){
-					Element.Hidden = true;
-				}
-				if(typeof(Element.DomNode.StyleObj.bg) != 'undefined'){
-					BlessStyle.bg = Element.DomNode.StyleObj.bg;
-					DrawBox = true;
-				}else if(typeof(Element.DomNode.backgroundImage) != 'undefined'){
-					Element.BgImage = Element.DomNode.backgroundImage;
-				}
-				
-				if(typeof(Element.DomNode.StyleObj.fg) != 'undefined'){
-					BlessStyle.fg = Element.DomNode.StyleObj.fg;
-				}
-			}
-			if(!HasStartedAdding && Element.ElemType == 'BODY'){
-				HasStartedAdding = true;
-                Tab.ViewPort.style.bg = PageDefaultColorValues.bgcolor;
-            }
-
-			Element.Inheritable = {};
-			var BlessOwner = RootBless;
-			var LayerIsVisible = false;
-			var PosRelativeTo = [0,0];
-			/*
-			var ClosestLayerOwner = Element;
-			while(ClosestLayerOwner = findOwner(ClosestLayerOwner._owner, 'Layer', true)){
-				if(typeof(ClosestLayerOwner.blessBox) != 'undefined'){
-					if(ClosestLayerOwner.Size[0] != 0 && ClosestLayerOwner[1] != 0){
-						DrawBox = true;
-						PosRelativeTo = ClosestLayerOwner.Pos;
-						BlessOwner = ClosestLayerOwner.blessBox;
-						break;
-					}else{
-						LayerIsVisible = false;
-					}
-				}
-			}*/
-			if(typeof(Element.Layer) != 'undefined'){
-				//sysEvents.OnTermkitNotice("Layer:",Element.ElemType, Element._id)
-				//DrawBox = true;
-				if(Element.Size[0] != 0 && Element.Size[1] != 0){
-					Element.VisibleLayer = Element.Layer;
-				}
-			}
-			var IsHidden = findOwner(Element, 'Hidden', true);
-			if(IsHidden){
-				return;
-			}
-			
-			var ClosestLayerOwner = findOwner(Element._owner, 'VisibleLayer', true);
-			if(ClosestLayerOwner){
-				LayerIsVisible = true;
-			}else{
-			
-			}
-			if(ClosestLayerOwner && typeof(ClosestLayerOwner.blessBox) != 'undefined'){
-				DrawBox = true;
-				PosRelativeTo = ClosestLayerOwner.Pos;
-				BlessOwner = ClosestLayerOwner.blessBox;
-			}
-			
-
-			var BlesSettings = {
-				parent: BlessOwner,
-				style: BlessStyle,
-				//shrink: false,
-				//scrollable: false,
-				//fixed: true,
-				//childBase: 0
-			};
-
-			if(SelectebleElementTypes.indexOf(Element.ElemType) != -1){
-				Tab.SelectebleElements.push(Element)
-				DrawBox = true;
-				Element.Selecteble_id = Tab.SelectebleElements.length-1;
-			}else{
-				if(Element._owner && Element._owner.Selecteble_id){
-					Element.Selecteble_id = Element._owner.Selecteble_id;
-				}
-			}
-			if(Element.Selecteble_id){
-				BlesSettings.clickable = true;
-				
-				//Selecteble text is underlined so one can know it is selecteble
-				if(typeof(Element.Text) != "undefined"){
-					BlessStyle.underline = true;
-				}
-			}
-			if(typeof(Element.ZIndex) != 'undefined'){
-				if(typeof(ZindexMap[Element.ZIndex]) == 'undefined'){
-					ZindexMap[Element.ZIndex] = [];
-				}
-				ZindexMap[Element.ZIndex].push(Element);
-				//Element.blessBox.setFront();
-			}
-			
-			//Handle special Types that we need "shadow dom" for
-			var SpecialType = false;
-			
-			//I would like to convert images to assci drawings
-			if(Element.Type == "RenderImage"){
-				DrawBox = true;
-				SpecialType = Element.ElemType;
-				BlessStyle.bg = "#7f7f7f";
-				BlessStyle.fg = "#000000";
-			}
-			//Background images cause more problems than they solve so they are inactivated
-			if(false && typeof(Element.BgImage) != 'undefined'){
-				DrawBox = true;
-				SpecialType = Element.ElemType;
-				BlessStyle.bg = "#7f7f7f";
-				BlessStyle.fg = "#000000";
-			}
-			//We dont render SVG i would ihowever like to render them as images
-			if(Element.Type == "RenderSVGRoot"){
-				DrawBox = true;
-				SpecialType = Element.ElemType;
-				BlessStyle.bg = "#7f7f7f";
-				BlessStyle.fg = "#000000";
-			}
-			//We dont render Iframes cause it would require more work
-			if(Element.Type == "RenderPartObject"){
-				DrawBox = true;
-				SpecialType = Element.ElemType;
-				BlessStyle.bg = "#7f7f7f";
-				BlessStyle.fg = "#000000";
-			}
-			//we need to render elements that has ZIndex so that they get a blessbox that their kids can attach to
-			if(typeof(Element.ZIndex) != 'undefined'){
-				DrawBox = true;
-				/*if(typeof(BlessStyle.bg) == 'undefined'){
-					BlessStyle.bg = "#7f7f7f";
-				}*/
-			}
-
-			//Save Inheritable properties
-			var DbugTxt = "Self";
-			//Inherit bg from closest owner
-			if(typeof(BlessStyle.bg) == 'undefined'){
-				var ClosestOwnerWithBg = findOwner(Element, 'bg');
-				if(ClosestOwnerWithBg){
-					BlessStyle.bg = ClosestOwnerWithBg.Inheritable.bg;
-					DbugTxt = ClosestOwnerWithBg._id+"="+ClosestOwnerWithBg.ElemType;
-				}else{
-					BlessStyle.bg = PageDefaultColorValues.bgcolor;
-				}
-			}else{
-				if(typeof(BlessStyle.bg) != 'undefined'){
-					Element.Inheritable.bg = BlessStyle.bg;
-				}
-			}
-			//Inherit fg from closest owner
-			if(typeof(BlessStyle.fg) == 'undefined'){
-				var ClosestOwnerWithFg = findOwner(Element, 'fg');
-				if(ClosestOwnerWithFg){
-					BlessStyle.fg = ClosestOwnerWithFg.Inheritable.fg;
-				}else{
-					BlessStyle.fg = PageDefaultColorValues.color;
-				}
-			}else{
-				if(typeof(BlessStyle.fg) != 'undefined'){
-					Element.Inheritable.fg = BlessStyle.fg;
-				}
-			}
-			//Layers will always draw a background so anything inside a layer will get to inherit it
-			if(typeof(Element.VisibleLayer) != 'undefined' && DrawBox){
-				//BlessStyle.bg = "blue";
-				//Element.Inheritable.bg = BlessStyle.bg;
-			}
-			var UsedBSettings = false;
-			//Create blessed elements
-            if(typeof(Element.Text) == "undefined"){
-                var TermPos = terminalConverter.getTerminalPos(Element.Pos, Element.Size, PosRelativeTo);
-				if(TermPos === false){
-					//sysEvents.OnTermkitNotice("Size is zero Not drawn:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
-					if(typeof(Element.Layer) != 'undefined'){
-						Element.Hidden = true;
-						DrawBox = false;
-					}
-				}
-				//Problems ocure when rendering stuff as it may overwrite its siblings children 
-                if(DrawBox && HasStartedAdding && StrangTypes.indexOf(Element.Type) == -1 && Element.ElemType != 'none' &&
-					DebugElementTypes.indexOf(Element.ElemType) == -1){
-					
-                    if(TermPos !== false){
-						BlesSettings.left = TermPos.left;
-						BlesSettings.top = TermPos.top;
-						BlesSettings.width = TermPos.width;
-						BlesSettings.height = TermPos.height;
-						//console.log("Drawn:", Element.ElemType+":"+[TermPos.left, TermPos.top].join('*')+":"+[TermPos.width, TermPos.height].join('*')+"_"+Element._id)
-						if(SpecialType != false){
-							//BlesSettings.content = SpecialType;
-							//BlesSettings.valign = 'middle';
-							//BlesSettings.align = 'center';
-						}
-						//BlesSettings.noOverflow = true;
-						UsedBSettings = BlesSettings;
-						if(typeof(Element.ZIndex) != 'undefined'){
-							//Element.blessBox.setIndex(Element.ZIndex);
-						}
-                    }
-				}else{
-					//console.log("Not a rendereble element:",Element._id+"="+Element.ElemType+":"+Element.Size.join('x'))
-				}
-            }else if(LayerIsVisible && ForbidenStrings.indexOf(Element.Text.trim()) == -1){
-                var TermPos = terminalConverter.getTerminalPos(Element.Pos, null, PosRelativeTo);
-				BlesSettings.left = TermPos.left;
-				BlesSettings.top = TermPos.top;
-				BlesSettings.noOverflow = true;
-				
-				var BrowserWidth = Element.TextWidth;
-				var PrintedCharWidth = wcwidth(Element.Text);
-
-				var CalcWidth = Math.max(PrintedCharWidth, 0);
-
-				//var AvgCharWidth = BrowserWidth/PrintedCharWidth;
-				//var AspRatio = AvgCharWidth/terminalConverter.FontSize;
-				//sysEvents.OnTermkitNotice("BrowserWidth:", Element.TextWidth, 'PrintedCharWidth:', PrintedCharWidth, "AvgCharWidth:", AvgCharWidth, 'AspRatio:', AspRatio);
-				//if(Math.round(AvgCharWidth) != AvgCharWidth){
-					//sysEvents.OnTermkitNotice("Uneven widthText:", Element.Text);
-				//}
-				//terminalConverter.FontAspectRatio
-				BlesSettings.width = CalcWidth;
-				//BlesSettings.width = terminalConverter.getTerminalX(Element.TextWidth);//Element.Text.length;
-				//BlesSettings.width = Element.Text.length;
-				BlesSettings.height = 1;
-				//console.log(Element.Where)
-				BlesSettings.content = TruncUnicode(Element.Text);
-				if(Element.Text.indexOf('Trailer') != -1){
-					//dump(Element);
-					//dbgclear();
-				}
-				
-				UsedBSettings = BlesSettings;
-            }
-			
-			//Now that we have most of the grapical stuff create our blessed obj
-			if(UsedBSettings){
-				if(UsedBSettings.clickable){
-					
-					BlessStyle.focus = {
-						'fg': StyleConfig.InputFgColor,
-						'bg': StyleConfig.InputFocusBgColor,
-					};
-					BlessStyle.hover = {
-						'bg': StyleConfig.InputHoverBgColor
-					};
-					//If it is the actual element we care about Or if the actual element was unprinted
-					if(Tab.SelectebleElements[Element.Selecteble_id] === Element || !Tab.SelectebleElements[Element.Selecteble_id].blessBox){
-						Element.blessBox = blessed.Button(UsedBSettings);
-						Element.blessBox.on('press',
-						function(mouse){
-							//BrowserActions.clearTab(Tab)
-							//Tab.ViewPort.style.bg = '#e86b55';
-							var ClickOwner = Tab.SelectebleElements[Element.Selecteble_id];
-							
-							//Figure out where the midle of the element is so we can send a click event to webkit 
-							var ClickX = ClickOwner.Pos[0];
-							var ClickY = ClickOwner.Pos[1];
-							//sysEvents.OnTermkitNotice("cliked object pos: "+(ClickX)+"x"+(ClickY));//Where did we click
-							ClickY -= Tab.LastViewPortScroll;
-							//sysEvents.OnTermkitNotice("Adjusted for Tab.LastViewPortScroll: "+(ClickY));//Where did we click
-							
-							//Pressed a pice of text
-							if(typeof(Element.TextWidth) != 'undefined'){
-									ClickX += Math.round(Element.TextWidth/2);
-									ClickY += Math.round(terminalConverter.FontSize/2);//Element._owner.Size[1]/2);
-							}else{
-								var InheritSize = findOwner(ClickOwner, 'Size', true);
-								if(InheritSize){
-									ClickX += Math.round(InheritSize.Size[0]/2);
-									ClickY += Math.round(InheritSize.Size[1]/2);
-								}
-							}
-							
-							//sysEvents.OnTermkitNotice("cliking("+Element.ElemType+") at"+(ClickX)+"x"+(ClickY));//Where did we acctually click
-							Tab.PhantomTab.sendEvent('click', ClickX, ClickY);
-							//setTimeout(screen.render();
-						});
-					}else{
-						//A kid of a blessed clickable element 
-						Element.blessBox = blessed.box(UsedBSettings);
-					}
-				}else{//Not a clickable element
-					Element.blessBox = blessed.box(BlesSettings);
-				}
-				
-				if(SpecialType != false){
-					FillChecker(Element.blessBox);
-				}
-			}
-
-        });
-
-		for(var ZIndex in ZindexMap){
-			var ElLen = ZindexMap[ZIndex].length-1;
-			for(var num in ZindexMap[ZIndex]){
-				var backNum = ElLen-num;
-				if(ZindexMap[ZIndex][backNum].blessBox){
-					ZindexMap[ZIndex][backNum].blessBox.setFront()
-				}
-			}
-		}
-		//console.log(dumpText)
-		//dump(RenderTree);
-		Tab.LastRenderTree = RenderTree; 
-		//Tab.ViewPort._refresh();
-		//ShowRenderTree(RenderTree);
-		//dbgclear();
-		//process.exit(1);
-        OnDone(RenderTree);
-    });
-
-}
-
-function ShowRenderTree(Tree){
-	for(var Num in Tree){
-		var Indent = "";
-		for(var k=0;Tree[Num].Indention>k;k++){
-			Indent += "  ";
-		}
-		var hLay = '';
-		if(typeof(Tree[Num].Layer) != 'undefined'){
-			hLay = 'hasLayer';
-		}
-		console.log(Indent, Tree[Num]._id, Tree[Num].Type, "<"+Tree[Num].ElemType+">", Tree[Num].Pos[0]+"x"+Tree[Num].Pos[1], Tree[Num].What, "at", Tree[Num].Where,
-"->", hLay);
-		//console.log(Indent, Tree[Num].What, "at", Tree[Num].Where);
-		if(Tree[Num].children && Tree[Num].children.length != 0){
-			ShowRenderTree(Tree[Num].children);
-		}
-	}
-}
 
 //gets element info from the dom
 function JSdomInfo(Tab, OnDone){
@@ -1078,7 +730,6 @@ function UrlClean(url, From){
 }
 
 
-screen.render();
 
 
 function clone(obj) {
