@@ -9,6 +9,7 @@ module.exports = {
     InputFocusBgColor: 'red',
     InputHoverBgColor: '#F7A3F1',
     ConsoleBgColor: '#777777',
+    ConsoleFgColor: '#000000',
     DefaultTabBgColor: '#FFFFFF',
     DefaultTabFgColor: '#000000',
 };

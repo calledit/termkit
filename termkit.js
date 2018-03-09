@@ -1,38 +1,6 @@
 const CDP = require('chrome-remote-interface');
 var blessed = require('blessed');
 //var wcwidth = require('wcwidth');
-//
-/*
-CDP((client) => {
-    // extract domains
-    const {Network, Page} = client;
-    // setup handlers
-    Network.requestWillBeSent((params) => {
-        console.log(params.request.url);
-    });
-    Page.loadEventFired(() => {
-        client.close();
-    });
-    // enable events then start!
-    Promise.all([
-        Network.enable(),
-        Page.enable()
-    ]).then(() => {
-        return Page.navigate({url: 'https://github.com'});
-    }).catch((err) => {
-        console.error(err);
-        client.close();
-    });
-}).on('error', (err) => {
-    // cannot connect to the remote endpoint
-    console.error(err);
-});
-*/
-/*
-var blessed = require('blessed'),
-    phantom = require('phantom');
-var render_parser = require('./parse_rendertree.js');
-*/
 
 var screen = blessed.screen();
 
@@ -43,7 +11,110 @@ screen.key(['escape', 'q', 'C-c'], function(ch, key) {
 
 var StyleConfig = require('./include/config.js');
 
-var gui = require('./include/gui.js').setup(screen, blessed, StyleConfig);
+var gui_code = require('./include/gui.js');
+var gui = gui_code.browser_gui_setup(screen, blessed, StyleConfig);
+
+
+function handle_browser_tab(client){
+
+    const {Page, LayerTree} = client;
+	
+	var bless_tab_gui = gui_code.tab_gui_setup(gui, blessed, StyleConfig)
+	screen.render();
+
+	Page.loadEventFired(function(){
+        gui.console_box.unshiftLine('page has loaded');
+		screen.render();
+		//console.log('page has loaded');
+    });
+
+	//Capture Layers for this page
+    LayerTree.layerTreeDidChange(function(layers){
+		
+		console.log(layers.layers);
+		process.exit(0);
+		return;
+			
+		//Clear old layers
+		for(x in bless_tab_gui.view_port.children){
+			bless_tab_gui.view_port.children[x].detach();
+		}
+	
+		//Draw new layers	
+		var layer_by_id = {};
+		for(x in layers.layers){
+			var layer = layers.layers[x];
+			layer_by_id[layer.layerId] = layer;
+		}
+		for(layer_id in layer_by_id){
+			var layer = layer_by_id[layer_id];
+			var bless_data = {
+				parent: bless_tab_gui.view_port,
+				left: terminalConverter.getTerminalX(layer.offsetX),
+				top: terminalConverter.getTerminalY(layer.offsetY),
+				content: 'layer: '+x,
+				border:{type:'line'},
+
+				width: terminalConverter.getTerminalX(layer.width),
+				height: terminalConverter.getTerminalY(layer.height)
+			};
+			if(typeof(layer.parentLayerId) != 'undefined'){
+				bless_data.parent = layer_by_id[layer.parentLayerId].bless_box;
+			}
+			//console.log(bless_data);
+			layer.bless_box = blessed.box(bless_data);
+			if(layer_id == 2){
+				break;
+			}
+			
+		}
+		screen.render();
+    });
+
+    //enable events then start!
+    Promise.all([
+        LayerTree.enable(),
+        Page.enable(),
+		Page.getLayoutMetrics()
+    ]).then(function(values){
+		//console.log(values[2].visualViewport.clientWidth);
+		//console.log(values[2].layoutViewport);
+
+        //terminalConverter.browserSize.width = values[2].visualViewport.clientWidth;
+        //terminalConverter.browserSize.height = values[2].visualViewport.clientHeight;
+
+		//var url = 'https://github.com';
+		var url = 'https://www.facebook.com/';
+		bless_tab_gui.addres_bar_url_input.setValue(url);
+		screen.render();
+        return Page.navigate({url: url});
+    }).catch(function(err){
+
+        console.error(err);
+        client.close();
+    });
+
+}
+
+//Open a conection to chrome we start with an active page use the Target Domain to Create and alter tabs
+CDP(function(client){
+		
+		//Create a tab(we dont need to as chrome deos that by itself the first time)
+
+		//there is a tab now
+		handle_browser_tab(client);
+		/*
+		Network.requestWillBeSent((params) => {
+			console.log(params.request.url);
+		});
+		*/
+    }).on('error', function(err){
+		// cannot connect to the remote endpoint
+		console.error(err);
+		console.log("start chrome: google-chrome --headless --remote-debugging-port=9222 ''")
+		///Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+});
+
 
 var settings = {
 	ScrollMultiplier: 0.5,
@@ -132,6 +203,8 @@ var terminalConverter = {
         return(Rets);
     }
 };
+
+//Caclulate wanted browser size but chrome will use the size it wants unless it is headless
 terminalConverter.getBrowserSize();
 
 var Tabs = [];
@@ -140,12 +213,14 @@ var Tabs = [];
 screen.key(['C-r'], function(ch, key) {
 	
 	//clear screen so that the user can sa there has been a refresh
-	BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
+	//BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
 	screen.render();
 	
+/*
     renderTab(Tabs[termKitState.ActiveTab], function(){
         screen.render();
     });
+*/
 });
 screen.key(['pageup'], function(ch, key) {//PgUp
 	//BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
@@ -194,8 +269,8 @@ var sysEvents = {
 		if(typeof(process.argv[2]) != 'undefined'){
 			UrlToLoadOnStart = process.argv[2];
 		}
-        BrowserActions.newTab(UrlClean(UrlToLoadOnStart, 'Argv'));
-        screen.render();
+        //BrowserActions.newTab(UrlClean(UrlToLoadOnStart, 'Argv'));
+        //screen.render();
     },
     OnPhantomNotice: function(){
 		ConsoleMessageId += 1;
@@ -229,7 +304,6 @@ phantom.create({
 });
 */
 
-screen.render();
 
 var BrowserActions = {
 	clearTab: function(Tab){
@@ -254,146 +328,7 @@ var BrowserActions = {
             loadWebsite = false;
             url = '';
         }
-        var Tab = {};
-		Tab.LastViewPortScroll = 0;
-		Tab.SelectebleElements = [];
-        Tab.BarForm = blessed.Form({
-            parent: gui.top_menu,
-            keys: true,
-            left: 0,
-            top: 1,
-            width: '100%',
-            height: 1,
-            style: {
-                'bg': StyleConfig.MenuBgColor
-            }
-        });
-        Tab.BarUrlInput = blessed.Textbox({
-            parent: Tab.BarForm,
-            keys: true,
-            mouse: true,
-            inputOnFocus: true,
-            left: 1,
-            top: 0,
-            width: '65%',
-            height: 1,
-            style: {
-                'bg': StyleConfig.InputBgColor,
-                'focus':{
-                    'bg': StyleConfig.InputFocusBgColor,
-                    'fg': StyleConfig.InputFgColor,
-                },
-                'hover':{
-                    'bg': StyleConfig.InputHoverBgColor
-                },
-            }
-        });
-
-        Tab.BarSearchInput = blessed.Textbox({
-            parent: Tab.BarForm,
-            keys: true,
-            mouse: true,
-            inputOnFocus: true,
-            left: '70%',
-            top: 0,
-            width: '15%',
-            height: 1,
-            style: {
-                'bg': StyleConfig.InputBgColor,
-                'focus':{
-                    'fg': StyleConfig.InputFgColor,
-                    'bg': StyleConfig.InputFocusBgColor,
-                },
-                'hover':{
-                    'bg': StyleConfig.InputHoverBgColor
-                },
-            }
-        });
-        Tab.DumpRenderTreeButton = blessed.Button({
-            parent: Tab.BarForm,
-            mouse: true,
-            left: '94%',
-            top: 0,
-			align: 'center',
-            width:  6,
-            height: 1,
-			content: 'Dump',
-            style: {
-                'bg': StyleConfig.MenuButtonBgColor,
-                'fg': StyleConfig.MenuButtonFgColor,
-                'focus':{
-                    'fg': StyleConfig.InputFgColor,
-                    'bg': StyleConfig.InputFocusBgColor,
-                },
-                'hover':{
-                    'bg': StyleConfig.InputHoverBgColor
-                },
-            }
-		});
-		Tab.DumpRenderTreeButton.on('press', function(){
-			if(typeof(Tab.LastRenderTree) != 'undefined'){
-				ShowRenderTree(Tab.LastRenderTree);
-				dbgclear();
-			}else{
-				sysEvents.OnPhantomNotice("No Render Tree to dump.");
-			}
-		});
-        Tab.AlterTextSizeBox = blessed.Checkbox({
-            parent: Tab.BarForm,
-            mouse: true,
-			checked: settings.DefaultFontFix,
-            left: '85%',
-            top: 0,
-            width:  13,
-            height: 1,
-            style: {
-                'bg': StyleConfig.MenuBgColor,
-                'fg': StyleConfig.MenuFgColor,
-                'focus':{
-                    'fg': StyleConfig.InputFgColor,
-                    'bg': StyleConfig.InputFocusBgColor,
-                },
-                'hover':{
-                    'bg': StyleConfig.InputHoverBgColor
-                },
-            }
-        });
-		Tab.AlterTextSizeBox.text = 'Font Fix';
-		//We need to reload the entire page to reset the fonts
-		Tab.AlterTextSizeBox.on('uncheck', function(){
-			BrowserActions.reloadTab(Tab);
-		});
-		Tab.AlterTextSizeBox.on('check', function(){
-			renderTab(Tab, function(){
-				screen.render();
-			});
-		});
-		
-        Tab.ViewPort = blessed.Form({
-            parent: gui.view_port,
-            mouse: true,
-            keys: true,
-            scrollable: true,
-			alwaysScroll: true,
-			//noOverflow:true,
-			//baseLimit: 0,
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-            style: {
-                'bg': StyleConfig.ViewPortBgColor
-            }
-        });
-
-		//Scroll phantom when we scroll blessed
-		Tab.ViewPort.on('scroll', function(){
-			var BlessLinesY = BlessGetScroll(Tab.ViewPort);
-			Tab.LastViewPortScroll = terminalConverter.getBrowserY(BlessLinesY);
-			Tab.PhantomTab.set('scrollPosition', {top:Tab.LastViewPortScroll,left:0});
-		});
-
-        
+                
         //Get A tab from phantom 
         /*
         phantomProccess.createPage(function(PTab){
@@ -464,7 +399,7 @@ var BrowserActions = {
     }
 };
 
-sysEvents.OnPhantomLoaded();
+//sysEvents.OnPhantomLoaded();
 
 function renderTab(Tab, OnDone){
     
