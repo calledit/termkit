@@ -33,6 +33,7 @@ var blessed = require('blessed'),
     phantom = require('phantom');
 var render_parser = require('./parse_rendertree.js');
 */
+
 var screen = blessed.screen();
 
 //exit when user preses one of the quit keys
@@ -40,20 +41,9 @@ screen.key(['escape', 'q', 'C-c'], function(ch, key) {
   return process.exit(0);
 });
 
-var StyleConfig = {
-    MenuBgColor: '#C1C1C1',
-    MenuFgColor: '#000000',
-    MenuButtonBgColor: '#4D4D4D',
-    MenuButtonFgColor: '#FFFFFF',
-    ViewPortBgColor: '#FFFFFF',
-    InputBgColor: '#FFFFFF',
-    InputFgColor: '#000000',
-    InputFocusBgColor: 'red',
-    InputHoverBgColor: '#F7A3F1',
-    ConsoleBgColor: '#777777',
-    DefaultTabBgColor: '#FFFFFF',
-    DefaultTabFgColor: '#000000',
-};
+var StyleConfig = require('./include/config.js');
+
+var gui = require('./include/gui.js').setup(screen, blessed, StyleConfig);
 
 var settings = {
 	ScrollMultiplier: 0.5,
@@ -74,66 +64,43 @@ var termKitState = {
 };
 
 
-
-var TopMenu = blessed.box({
-    parent: screen,
-    left: 0,
-    top: 0,
-    width: '100%',
-    height: 3,
-    style: {
-        'bg': StyleConfig.MenuBgColor
-    }
-});
-
-var ConsoleBox = blessed.box({
-    parent: screen,
-    left: 0,
-    top: TopMenu.height,
-    bottom: TopMenu.height,
-    width: '100%',
-    height: 2,
-    mouse: true,
-    scrollable: true,
-    style: {
-        'bg': StyleConfig.ConsoleBgColor
-    }
-});
-
-var ViewPort = blessed.box({
-    parent: screen,
-    left: 0,
-    top: TopMenu.height + ConsoleBox.height ,
-    width: '100%',
-    height: screen.height - TopMenu.height - ConsoleBox.height,
-    style: {
-        'bg': StyleConfig.ViewPortBgColor
-    }
-});
-
 var terminalConverter = {
-    FontSize: 12,
-    FontAspectRatio: 0.5833333, //The messured asspec ratio of the font //We use the Courier font as is is the most comon monospace font
+    FontSize: 12,//the font size of the console 
+    FontAspectRatio: 0.5833333, //The asspect ratio of the console font //We use the Courier font as is is the most comon monospace font
     browserSize: {},
+
+	//gets the simulated pixel width and height of the browser
     getBrowserSize: function(){
-        terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*ViewPort.width);
-        terminalConverter.browserSize.height = Math.round(terminalConverter.FontSize*ViewPort.height);
-        //terminalConverter.browserSize.height = 768;
-        //terminalConverter.browserSize.width = 1024;
+        terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*gui.view_port.width);
+        terminalConverter.browserSize.height = Math.round(terminalConverter.FontSize*gui.view_port.height);
+
+
+		//use a fixed size when debuging some things
+		//if(dbg){
+			//terminalConverter.browserSize.height = 768;
+			//terminalConverter.browserSize.width = 1024;
+        //}
         return(terminalConverter.browserSize);
     },
+	
+	//gets the x pixel in the browser based on a character x position in the console
     getBrowserX: function(TerminalX){
         return(Math.round(TerminalX*terminalConverter.FontSize*terminalConverter.FontAspectRatio));
     },
+	//gets the y pixel in the browser based on a character x position in the console
     getBrowserY: function(TerminalY){
         return(Math.round(TerminalY*terminalConverter.FontSize));
     },
+	//gets the x position in the console based on a x pixel in the browser
     getTerminalX: function(browserX){
         return(Math.round(browserX/(terminalConverter.FontSize*terminalConverter.FontAspectRatio)));
     },
+	//gets the y position in the console based on a y pixel in the browser
     getTerminalY: function(browserY){
         return(Math.round(browserY/terminalConverter.FontSize));
-    },getTerminalPos: function(Pos, Size, BrowsPosRelativeTo, IsLayer){
+    },
+	//dont Know what this does XXXXX
+	getTerminalPos: function(Pos, Size, BrowsPosRelativeTo, IsLayer){
 		var PosRelativeTo = [0,0];
         if(typeof(BrowsPosRelativeTo) != 'undefined'){
 			PosRelativeTo = [terminalConverter.getTerminalX(BrowsPosRelativeTo[0]), terminalConverter.getTerminalY(BrowsPosRelativeTo[1])];
@@ -207,7 +174,7 @@ screen.key(['backspace'], function(ch, key) {
 });
 
 screen.on('resize', function(){
-    ViewPort.height = screen.height - TopMenu.height - ConsoleBox.height;
+    gui.view_port.height = screen.height - gui.top_menu.height - gui.console_box.height;
     terminalConverter.getBrowserSize();
 /*
     for(tbid in Tabs){
@@ -291,7 +258,7 @@ var BrowserActions = {
 		Tab.LastViewPortScroll = 0;
 		Tab.SelectebleElements = [];
         Tab.BarForm = blessed.Form({
-            parent: TopMenu,
+            parent: gui.top_menu,
             keys: true,
             left: 0,
             top: 1,
@@ -403,7 +370,7 @@ var BrowserActions = {
 		});
 		
         Tab.ViewPort = blessed.Form({
-            parent: ViewPort,
+            parent: gui.view_port,
             mouse: true,
             keys: true,
             scrollable: true,
