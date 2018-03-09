@@ -17,7 +17,7 @@ var gui = gui_code.browser_gui_setup(screen, blessed, StyleConfig);
 
 function handle_browser_tab(client){
 
-    const {Page, LayerTree} = client;
+    const {Page, LayerTree, DOMSnapshot} = client;
 	
 	var bless_tab_gui = gui_code.tab_gui_setup(gui, blessed, StyleConfig)
 	screen.render();
@@ -31,44 +31,121 @@ function handle_browser_tab(client){
 	//Capture Layers for this page
     LayerTree.layerTreeDidChange(function(layers){
 		
-		console.log(layers.layers);
-		process.exit(0);
-		return;
-			
-		//Clear old layers
-		for(x in bless_tab_gui.view_port.children){
-			bless_tab_gui.view_port.children[x].detach();
-		}
-	
-		//Draw new layers	
-		var layer_by_id = {};
-		for(x in layers.layers){
-			var layer = layers.layers[x];
-			layer_by_id[layer.layerId] = layer;
-		}
-		for(layer_id in layer_by_id){
-			var layer = layer_by_id[layer_id];
-			var bless_data = {
-				parent: bless_tab_gui.view_port,
-				left: terminalConverter.getTerminalX(layer.offsetX),
-				top: terminalConverter.getTerminalY(layer.offsetY),
-				content: 'layer: '+x,
-				border:{type:'line'},
+		//console.log(layers.layers);
+		//process.exit(0);
+		//return;
+		//Styles= 
+		DOMSnapshot.getSnapshot({computedStyleWhitelist:['background-color', 'color']}).then(function(dom_snap){
 
-				width: terminalConverter.getTerminalX(layer.width),
-				height: terminalConverter.getTerminalY(layer.height)
-			};
-			if(typeof(layer.parentLayerId) != 'undefined'){
-				bless_data.parent = layer_by_id[layer.parentLayerId].bless_box;
+			//console.log(dom_snap);
+			//process.exit(0);
+
+
+			//dom_snap.layoutTreeNodes
+				
+			//Clear old layers
+			for(x in bless_tab_gui.view_port.children){
+				bless_tab_gui.view_port.children[x].detach();
 			}
-			//console.log(bless_data);
-			layer.bless_box = blessed.box(bless_data);
-			if(layer_id == 2){
-				break;
+
+			//Draw new layers	
+			var computed_styles = [];
+			for(x in dom_snap.computedStyles){
+				var cs = dom_snap.computedStyles[x];
+				var style = {};
+				for(i in cs.properties){
+					style[cs.properties[i].name] = cs.properties[i].value;
+				}
+				computed_styles[x] = style;
+			}
+
+			//var last_node = false;
+			for(layout_node in dom_snap.layoutTreeNodes){
+				var lay_nod = dom_snap.layoutTreeNodes[layout_node];
+				var dom_nod =  dom_snap.domNodes[lay_nod.domNodeIndex]
+				//console.log(dom_nod)
+				lay_nod.boundingBox;
+				var bless_data = {
+					left: terminalConverter.getTerminalX(lay_nod.boundingBox.x),
+					top: terminalConverter.getTerminalY(lay_nod.boundingBox.y),
+
+					width: terminalConverter.getTerminalX(lay_nod.boundingBox.width),
+					height: terminalConverter.getTerminalY(lay_nod.boundingBox.height),
+
+					content: ''+layout_node,
+					//border:{type:'line'},
+					style:{}
+
+				};
+				if(typeof(dom_nod.nodeValue) != 'undefined'){
+					bless_data.content = dom_nod.nodeValue;
+					//console.log(dom_nod.textValue);
+				}
+				if(typeof(lay_nod.styleIndex) != 'undefined'){
+					computedStyles = dom_snap.computedStyles[lay_nod.styleIndex];
+					if(computed_styles[lay_nod.styleIndex]['background-color'] != 'rgba(0, 0, 0, 0)'){
+						rgb = GetRGB(computed_styles[lay_nod.styleIndex]['background-color'], 'rgb');
+						bless_data.style.bg = rgb
+/*
+						for(o in dom_nod.childNodeIndexes){
+							var index = dom_nod.childNodeIndexes[o]
+							if(typeof(dom_snap.domNodes[index].layoutNodeIndex) != 'undefined'){
+								ChildLayout = dom_snap.layoutTreeNodes[dom_snap.domNodes[index].layoutNodeIndex];
+								computed_styles[ChildLayout.styleIndex]['background-color'] = computed_styles[lay_nod.styleIndex]['background-color'];
+								//ChildLayout.
+							}
+						}
+*/
+						//console.log(rgb);
+						//console.log(layout_node, lay_nod.boundingBox, bless_data, computedStyles);
+					}else{
+						//console.log(computed_styles[lay_nod.styleIndex]['background-color']);
+						bless_data.style.transparent = true;
+						//bless_data.style.bg = '#ff0000';
+					}
+					
+				}
+				bless_data.parent = bless_tab_gui.view_port;
+				if(lay_nod.boundingBox.width > 0 && lay_nod.boundingBox.height > 0){
+					lay_nod.bless_box = blessed.box(bless_data);
+				}
+			}
+/*		
+
+			//Draw new layers	
+			var layer_by_id = {};
+			for(x in layers.layers){
+				var layer = layers.layers[x];
+				layer_by_id[layer.layerId] = layer;
 			}
 			
-		}
-		screen.render();
+			for(layer_id in layer_by_id){
+				var layer = layer_by_id[layer_id];
+				var bless_data = {
+					parent: bless_tab_gui.view_port,
+					left: terminalConverter.getTerminalX(layer.offsetX),
+					top: terminalConverter.getTerminalY(layer.offsetY),
+
+					width: terminalConverter.getTerminalX(layer.width),
+					height: terminalConverter.getTerminalY(layer.height),
+
+					content: 'layer: '+layer_id,
+					border:{type:'line'}
+				};
+				if(typeof(layer.parentLayerId) != 'undefined'){
+					bless_data.parent = layer_by_id[layer.parentLayerId].bless_box;
+				}
+				//console.log(bless_data);
+				layer.bless_box = blessed.box(bless_data);
+				
+			}
+*/
+			screen.render();
+		}).catch(function(err){
+
+			console.error(err);
+			client.close();
+		});
     });
 
     //enable events then start!
@@ -82,9 +159,14 @@ function handle_browser_tab(client){
 
         //terminalConverter.browserSize.width = values[2].visualViewport.clientWidth;
         //terminalConverter.browserSize.height = values[2].visualViewport.clientHeight;
+        //
+        Page.addScriptToEvaluateOnNewDocument({source: 
+'if(document.body){elems = document.body.getElementsByTagName("*");for(i in elems){if(elems[i].style){elems[i].style.fontFamily = "courier";elems[i].style.lineHeight = "1";elems[i].style.fontSize = "12px";elems[i].style.verticalAlign = "inherit";}}}'
+})
 
 		//var url = 'https://github.com';
-		var url = 'https://www.facebook.com/';
+		//var url = 'https://www.facebook.com/';
+		var url = 'http://news.ycombinator.com/';
 		bless_tab_gui.addres_bar_url_input.setValue(url);
 		screen.render();
         return Page.navigate({url: url});
@@ -136,7 +218,7 @@ var termKitState = {
 
 
 var terminalConverter = {
-    FontSize: 12,//the font size of the console 
+    FontSize: 11,//the font size of the console 
     FontAspectRatio: 0.5833333, //The asspect ratio of the console font //We use the Courier font as is is the most comon monospace font
     browserSize: {},
 
