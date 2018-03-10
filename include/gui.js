@@ -83,6 +83,8 @@ module.exports = {
             }
         });
 
+
+
         tab_gui.addres_bar_search_input = blessed.Textbox({
             parent: tab_gui.addres_bar_form,
             keys: true,
@@ -123,10 +125,6 @@ module.exports = {
                     'bg': StyleConfig.InputHoverBgColor
                 },
             }
-		});
-
-		tab_gui.debug_button.on('press', function(){
-
 		});
 
         tab_gui.alter_text_size_box = blessed.Checkbox({

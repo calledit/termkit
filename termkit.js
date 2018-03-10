@@ -1,5 +1,6 @@
 const CDP = require('chrome-remote-interface');
 var blessed = require('blessed');
+var fs = require('fs');
 //var wcwidth = require('wcwidth');
 
 var screen = blessed.screen();
@@ -13,104 +14,192 @@ var StyleConfig = require('./include/config.js');
 
 var gui_code = require('./include/gui.js');
 var gui = gui_code.browser_gui_setup(screen, blessed, StyleConfig);
+var bless_tab_gui = gui_code.tab_gui_setup(gui, blessed, StyleConfig)
+var Page, DOMSnapshot, LayerTree, Emulation, Target;
 
 
-function handle_browser_tab(client){
-
-    const {Page, LayerTree, DOMSnapshot} = client;
+bless_tab_gui.debug_button.on('press', function(){
+	Promise.all([
+		Page.getLayoutMetrics(),
+		Target.getTargets()
+	])
+	.then(function(val){
+		metr = val[0];
+		gui.console_box.unshiftLine('The VisibleSize is width: '+metr.layoutViewport.clientWidth+' height: '+metr.layoutViewport.clientHeight);
+		screen.render();
+		//console.log(val[1])
+	}).catch(function(err){
+		console.log("Failed to set browser size", err);
+		process.exit(0);
+	});
 	
-	var bless_tab_gui = gui_code.tab_gui_setup(gui, blessed, StyleConfig)
-	screen.render();
+		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
+		.then(function(){
+			gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
+			//handle_browser_tab(client);
+		}).catch(function(err){
+			console.log("Failed to set browser size", err);
+			process.exit(0);
+		});
+	
+});
 
+
+
+function m(x){
+	return x*3.5
+}
+function write_debug_file(boxes){
+	
+	str = "";
+	for(x in boxes){
+		var box = boxes[x];
+		dim = "width:"+m(box.width)+"px;";
+		dim += "height:"+m(box.height)+"px;";
+		dim += "left:"+m(box.left)+"px;";
+		dim += "top:"+m(box.top)+"px;";
+		str += "<div style=\""+dim+"\">"+box.content+"</div>";
+	}
+	fs.writeFileSync('./debug.html', '<html><style>body{font-size:5}div{border: 1px solid black;position:absolute;}</style><body>'+str+'</body></html>');
+}
+
+function render_from_dom(dom_snap, view_port){
+
+		//console.log(dom_snap);
+		//process.exit(0);
+
+
+		//dom_snap.layoutTreeNodes
+			
+		//Clear old layers
+		for(x in view_port.children){
+			view_port.children[x].detach();
+		}
+
+		//Draw new layers	
+		var computed_styles = [];
+		for(x in dom_snap.computedStyles){
+			var cs = dom_snap.computedStyles[x];
+			var style = {};
+			for(i in cs.properties){
+				style[cs.properties[i].name] = cs.properties[i].value;
+			}
+			computed_styles[x] = style;
+		}
+		var boxes = [];
+		//var last_node = false;
+		for(layout_node in dom_snap.layoutTreeNodes){
+			var lay_nod = dom_snap.layoutTreeNodes[layout_node];
+			var dom_nod =  dom_snap.domNodes[lay_nod.domNodeIndex]
+			//console.log(dom_nod)
+			lay_nod.boundingBox;
+			var bless_data = {
+				left: terminalConverter.getTerminalX(lay_nod.boundingBox.x),
+				top: terminalConverter.getTerminalY(lay_nod.boundingBox.y),
+
+				width: terminalConverter.getTerminalX(lay_nod.boundingBox.width),
+				height: terminalConverter.getTerminalY(lay_nod.boundingBox.height),
+
+				content: ''+layout_node,
+				//border:{type:'line'},
+				style:{}
+
+			};
+			if(typeof(dom_nod.nodeValue) != 'undefined'){
+				bless_data.content = dom_nod.nodeValue;
+				//console.log(dom_nod.textValue);
+			}
+			if(typeof(lay_nod.styleIndex) != 'undefined'){
+				computedStyles = dom_snap.computedStyles[lay_nod.styleIndex];
+				if(computed_styles[lay_nod.styleIndex]['background-color'] != 'rgba(0, 0, 0, 0)'){
+					rgb = GetRGB(computed_styles[lay_nod.styleIndex]['background-color'], 'rgb');
+					bless_data.style.bg = rgb
+/*
+					for(o in dom_nod.childNodeIndexes){
+						var index = dom_nod.childNodeIndexes[o]
+						if(typeof(dom_snap.domNodes[index].layoutNodeIndex) != 'undefined'){
+							ChildLayout = dom_snap.layoutTreeNodes[dom_snap.domNodes[index].layoutNodeIndex];
+							computed_styles[ChildLayout.styleIndex]['background-color'] = computed_styles[lay_nod.styleIndex]['background-color'];
+							//ChildLayout.
+						}
+					}
+*/
+					//console.log(rgb);
+					//console.log(layout_node, lay_nod.boundingBox, bless_data, computedStyles);
+				}else{
+					//console.log(computed_styles[lay_nod.styleIndex]['background-color']);
+					bless_data.style.transparent = true;
+					//bless_data.style.bg = '#ff0000';
+				}
+				
+			}
+			bless_data.parent = view_port;
+			if(lay_nod.boundingBox.width > 0 && lay_nod.boundingBox.height > 0){
+				boxes.push(bless_data);
+				lay_nod.bless_box = blessed.box(bless_data);
+			}
+		}
+
+		write_debug_file(boxes)
+
+}
+
+
+function update_view_port(){
+	//Get a snapshot of the DOM 
+	DOMSnapshot.getSnapshot({computedStyleWhitelist:['background-color', 'color']})
+	.then(function(dom_snap){
+			//Take the dom snapshot and make blessed boxes
+			render_from_dom(dom_snap, bless_tab_gui.view_port);
+			screen.render();
+	}).catch(function(err){
+		console.error(err);
+		client.close();
+	});
+
+}
+
+var page_load_times = 0;
+var layer_change_times = 0;
+function handle_browser_tab(){
+
+	
+	bless_tab_gui.addres_bar_url_input.on('submit', function(){
+		Page.navigate({url: UrlClean(bless_tab_gui.addres_bar_url_input.value, 'UrlBar')})
+	});
+	//screen.render();
+
+/*
 	Page.loadEventFired(function(){
-        gui.console_box.unshiftLine('page has loaded');
+		page_load_times++;
+        gui.console_box.unshiftLine('page has loaded: '+page_load_times);
 		screen.render();
 		//console.log('page has loaded');
     });
+*/
 
 	//Capture Layers for this page
-    LayerTree.layerTreeDidChange(function(layers){
+	//the layer tree never chnages it is the wrong thing to use
+    //LayerTree.layerTreeDidChange(function(layers){
+    Page.loadEventFired(function(layers){
+		page_load_times++;
+        gui.console_box.unshiftLine('page has loaded: '+page_load_times);
+
+		update_view_port();
+	//layer_change_times++;
+        //gui.console_box.unshiftLine('layerTreeDidChange: '+layer_change_times);
+        //gui.console_box.unshiftLine('layerPainted: '+layer_change_times);
+		
+
+		//DOMSnapshot.getSnapshot({computedStyleWhitelist:['background-color', 'color']})
+		//Target.getTargets().then(function(dom_snap){console.log(dom_snap)}).catch(function(){})
+		//Target.getTargets().then(function(dom_snap){console.log(dom_snap)}).catch(function(){})
 		
 		//console.log(layers.layers);
 		//process.exit(0);
 		//return;
 		//Styles= 
-		DOMSnapshot.getSnapshot({computedStyleWhitelist:['background-color', 'color']}).then(function(dom_snap){
-
-			//console.log(dom_snap);
-			//process.exit(0);
-
-
-			//dom_snap.layoutTreeNodes
-				
-			//Clear old layers
-			for(x in bless_tab_gui.view_port.children){
-				bless_tab_gui.view_port.children[x].detach();
-			}
-
-			//Draw new layers	
-			var computed_styles = [];
-			for(x in dom_snap.computedStyles){
-				var cs = dom_snap.computedStyles[x];
-				var style = {};
-				for(i in cs.properties){
-					style[cs.properties[i].name] = cs.properties[i].value;
-				}
-				computed_styles[x] = style;
-			}
-
-			//var last_node = false;
-			for(layout_node in dom_snap.layoutTreeNodes){
-				var lay_nod = dom_snap.layoutTreeNodes[layout_node];
-				var dom_nod =  dom_snap.domNodes[lay_nod.domNodeIndex]
-				//console.log(dom_nod)
-				lay_nod.boundingBox;
-				var bless_data = {
-					left: terminalConverter.getTerminalX(lay_nod.boundingBox.x),
-					top: terminalConverter.getTerminalY(lay_nod.boundingBox.y),
-
-					width: terminalConverter.getTerminalX(lay_nod.boundingBox.width),
-					height: terminalConverter.getTerminalY(lay_nod.boundingBox.height),
-
-					content: ''+layout_node,
-					//border:{type:'line'},
-					style:{}
-
-				};
-				if(typeof(dom_nod.nodeValue) != 'undefined'){
-					bless_data.content = dom_nod.nodeValue;
-					//console.log(dom_nod.textValue);
-				}
-				if(typeof(lay_nod.styleIndex) != 'undefined'){
-					computedStyles = dom_snap.computedStyles[lay_nod.styleIndex];
-					if(computed_styles[lay_nod.styleIndex]['background-color'] != 'rgba(0, 0, 0, 0)'){
-						rgb = GetRGB(computed_styles[lay_nod.styleIndex]['background-color'], 'rgb');
-						bless_data.style.bg = rgb
-/*
-						for(o in dom_nod.childNodeIndexes){
-							var index = dom_nod.childNodeIndexes[o]
-							if(typeof(dom_snap.domNodes[index].layoutNodeIndex) != 'undefined'){
-								ChildLayout = dom_snap.layoutTreeNodes[dom_snap.domNodes[index].layoutNodeIndex];
-								computed_styles[ChildLayout.styleIndex]['background-color'] = computed_styles[lay_nod.styleIndex]['background-color'];
-								//ChildLayout.
-							}
-						}
-*/
-						//console.log(rgb);
-						//console.log(layout_node, lay_nod.boundingBox, bless_data, computedStyles);
-					}else{
-						//console.log(computed_styles[lay_nod.styleIndex]['background-color']);
-						bless_data.style.transparent = true;
-						//bless_data.style.bg = '#ff0000';
-					}
-					
-				}
-				bless_data.parent = bless_tab_gui.view_port;
-				if(lay_nod.boundingBox.width > 0 && lay_nod.boundingBox.height > 0){
-					lay_nod.bless_box = blessed.box(bless_data);
-				}
-			}
-/*		
+	/*		
 
 			//Draw new layers	
 			var layer_by_id = {};
@@ -140,38 +229,56 @@ function handle_browser_tab(client){
 				
 			}
 */
-			screen.render();
-		}).catch(function(err){
-
-			console.error(err);
-			client.close();
-		});
     });
 
     //enable events then start!
     Promise.all([
         LayerTree.enable(),
         Page.enable(),
-		Page.getLayoutMetrics()
+		Page.getLayoutMetrics(),
+		Target.getTargets(),
+		Emulation.setDeviceMetricsOverride({
+			screenWidth: terminalConverter.browserSize.width,
+			screenHeight: terminalConverter.browserSize.height,
+			width: terminalConverter.browserSize.width,
+			height: terminalConverter.browserSize.height,
+			//width: 0,
+			//height: 0,
+			mobile: false,
+			deviceScaleFactor: 1
+		})
     ]).then(function(values){
 		//console.log(values[2].visualViewport.clientWidth);
+		//console.log(terminalConverter.browserSize);
 		//console.log(values[2].layoutViewport);
+		//
+		//console.log(values[3]);
+        //client.close();
+		//process.exit(0);
+
+		gui.console_box.unshiftLine('The VisibleSize is width: '+values[2].layoutViewport.clientWidth+' height: '+values[2].layoutViewport.clientHeight);
 
         //terminalConverter.browserSize.width = values[2].visualViewport.clientWidth;
         //terminalConverter.browserSize.height = values[2].visualViewport.clientHeight;
         //
         Page.addScriptToEvaluateOnNewDocument({source: 
-'if(document.body){elems = document.body.getElementsByTagName("*");for(i in elems){if(elems[i].style){elems[i].style.fontFamily = "courier";elems[i].style.lineHeight = "1";elems[i].style.fontSize = "12px";elems[i].style.verticalAlign = "inherit";}}}'
+'font_interval=setInterval(function(){if(document.body){elems = document.body.getElementsByTagName("*");for(i in elems){if(elems[i].style){elems[i].style.fontFamily = "courier";elems[i].style.lineHeight= "1";elems[i].style.fontSize = "12px";elems[i].style.verticalAlign = "inherit";}}}else{/*clearInterval(font_interval)*/}},100);'
 })
+		.then(function(script){
+			gui.console_box.unshiftLine('script_id: '+script.identifier);
+			screen.render();
+		}).catch(function(err){
+			console.log("Failed to set browser size", err);
+			process.exit(0);
+		});
 
 		//var url = 'https://github.com';
-		//var url = 'https://www.facebook.com/';
-		var url = 'http://news.ycombinator.com/';
+		var url = 'https://www.facebook.com/';
+		//var url = 'http://news.ycombinator.com/';
 		bless_tab_gui.addres_bar_url_input.setValue(url);
 		screen.render();
-        return Page.navigate({url: url});
+        return Page.navigate({url: UrlClean(bless_tab_gui.addres_bar_url_input.value, 'UrlBar')});
     }).catch(function(err){
-
         console.error(err);
         client.close();
     });
@@ -179,17 +286,70 @@ function handle_browser_tab(client){
 }
 
 //Open a conection to chrome we start with an active page use the Target Domain to Create and alter tabs
-CDP(function(client){
-		
-		//Create a tab(we dont need to as chrome deos that by itself the first time)
+CDP(function(recived_client){
+		client = recived_client;
+		Page = client.Page;
+		Target = client.Target;
+		DOMSnapshot = client.DOMSnapshot;
+		LayerTree = client.LayerTree
+		Emulation = client.Emulation;
 
-		//there is a tab now
-		handle_browser_tab(client);
+		//Create a tab(we dont need to as chrome deos that by itself the first time)
+		//
 		/*
-		Network.requestWillBeSent((params) => {
-			console.log(params.request.url);
+		
+		//first we kill all the old targets
+		Target.getTargets().then(function(targets){
+			for(x in targets.targetInfos){
+			//console.log("old targets:", targets)
+				//gui.console_box.unshiftLine('kill target: '.targets.targetInfos[x].targetId);
+			console.log("kill target:",targets.targetInfos[x])
+				//screen.render();
+				Target.closeTarget(targets.targetInfos[x]).then(function(ok){
+				if(!ok.success){
+					gui.console_box.unshiftLine('failed to close old target');
+					screen.render();
+				}
+				}).catch(function(){})
+			}
+			//process.exit(0);
+		//console.log(dom_snap)
+		}).catch(function(){})
+		//First we create our target
+		Target.createTarget({'url':'https://www.facebook.com/',width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.heigth}).then(function(targetId){
+
+        gui.console_box.unshiftLine('created: '+targetId.targetId);
+		//screen.render();
+//console.log(targetId.targetId);
+
+//console.log
+		//process.exit(0);
+	//pacn
+
+				
+				Target.attachToTarget(targetId).then(function(){
+					Target.activateTarget(targetId).then(function(){
+					}).catch(function(err){
+						console.error(err);
+						client.close();
+					});
+
+				}).catch(function(){});
+		}).catch(function(err){
+			console.error(err);
+			client.close();
 		});
 		*/
+
+		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
+		.then(function(){
+			gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
+			handle_browser_tab(client);
+		}).catch(function(err){
+			console.log("Failed to set browser size", err);
+			process.exit(0);
+		});
+
     }).on('error', function(err){
 		// cannot connect to the remote endpoint
 		console.error(err);
@@ -218,12 +378,15 @@ var termKitState = {
 
 
 var terminalConverter = {
-    FontSize: 11,//the font size of the console 
+    FontSize: 12,//the font size of the console 
     FontAspectRatio: 0.5833333, //The asspect ratio of the console font //We use the Courier font as is is the most comon monospace font
     browserSize: {},
 
 	//gets the simulated pixel width and height of the browser
     getBrowserSize: function(){
+		//console.log("screen height: "+ (gui.view_port.height*19))
+		//console.log(gui.view_port.width, gui.view_port.height)
+		//process.exit(0);
         terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*gui.view_port.width);
         terminalConverter.browserSize.height = Math.round(terminalConverter.FontSize*gui.view_port.height);
 
@@ -295,7 +458,7 @@ var Tabs = [];
 screen.key(['C-r'], function(ch, key) {
 	
 	//clear screen so that the user can sa there has been a refresh
-	//BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
+	update_view_port();
 	screen.render();
 	
 /*
