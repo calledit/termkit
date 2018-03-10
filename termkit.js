@@ -159,13 +159,30 @@ function update_view_port(){
 
 }
 
+function navigate(){
+	Page.navigate({url: UrlClean(bless_tab_gui.addres_bar_url_input.value, 'UrlBar')})
+	.then(function(){
+		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
+		.then(function(){
+			gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
+			//handle_browser_tab(client);
+		}).catch(function(err){
+			console.log("Failed to set browser size", err);
+			process.exit(0);
+		});
+	}).catch(function(err){
+		console.error(err);
+		client.close();
+	});
+}
+
 var page_load_times = 0;
 var layer_change_times = 0;
 function handle_browser_tab(){
 
 	
 	bless_tab_gui.addres_bar_url_input.on('submit', function(){
-		Page.navigate({url: UrlClean(bless_tab_gui.addres_bar_url_input.value, 'UrlBar')})
+		navigate();
 	});
 	//screen.render();
 
@@ -277,7 +294,7 @@ function handle_browser_tab(){
 		//var url = 'http://news.ycombinator.com/';
 		bless_tab_gui.addres_bar_url_input.setValue(url);
 		screen.render();
-        return Page.navigate({url: UrlClean(bless_tab_gui.addres_bar_url_input.value, 'UrlBar')});
+		navigate();
     }).catch(function(err){
         console.error(err);
         client.close();
