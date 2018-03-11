@@ -9,8 +9,15 @@ scroll with your mouse scroll wheel
 
 ## Status
 
-rewrite in progress
+Simple pages renders and are somewhat readable :)
 
+
+## Similar project
+
+https://github.com/tombh/texttop/tree/webext-rewrite
+
+## Looking for contributers
+Please come and help with the project. 
 
 ![Github screenshot](/misc/Github_rewrite.png)
 
@@ -21,7 +28,21 @@ cd termkit
 #Get dependencys
 ./build.sh
 
-#start browser
+#start browser in another tab
+#On OSX
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --headless
+#On linux
+google-chrome --headless --remote-debugging-port=9222
+
+#start termkit
 node termkit.js
+
+#Your terminal emulator needs mouse suport
+#To scroll use your mouse scroll wheel. To browse to a website use the address bar or click on links. (the clicking is not perfect and does not always work TODO someone FIX clicking)
+#Sometimes website are not renderd properly at load time, use Ctr+R to refresh the render.
+#Exit the browser with Esc or Q
+
+#TODO someone add keyboard support
+
 ```
 
