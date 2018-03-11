@@ -12,10 +12,7 @@ Simpler pages renders and are somewhat readable :)
 ## Looking for contributors
 Please come and help with the project. 
 
-## Similar project
-
-https://github.com/tombh/texttop/tree/webext-rewrite
-
+## Screenshot
 
 ![Github screenshot](/misc/Github_rewrite.png)
 
@@ -44,4 +41,8 @@ node termkit.js
 #TODO someone add proper keyboard support
 
 ```
+
+## Similar project
+
+https://github.com/tombh/texttop/tree/webext-rewrite
 
