@@ -1,7 +1,5 @@
 # WebKit based browser for the terminal.
 Based on nodejs, chrome-remote-interface, and blessed
-I believe that chrome-remote-interface requires node v8.
-Some of the newer features of "Chrome DevTools Protocol" are used. Chrome v64 has been proven to work.
 
 To enter a new url press the urlbar with your mouse
 scroll with your mouse scroll wheel or pgup and pgdown
@@ -21,7 +19,7 @@ Please come and help with the project.
 ```bash
 git clone https://github.com/callesg/termkit.git
 cd termkit
-#Get dependences
+#Get dependencies
 ./build.sh
 
 #start chrome with Chrome DevTools Protocol in another tab
@@ -42,6 +40,10 @@ node termkit.js
 #TODO someone add proper keyboard support
 
 ```
+## Dependencies
+I believe that chrome-remote-interface requires node v8.
+Some of the newer features of "Chrome DevTools Protocol" are used. Chrome v64 has been proven to work.
+
 
 ## Similar project
 
