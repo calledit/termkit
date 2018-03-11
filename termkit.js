@@ -3,6 +3,7 @@ var blessed = require('blessed');//Scrolling and parents are bugy in blessed
 var fs = require('fs');
 
 
+//Setup Blessed A GUI framework for the terminal
 var screen = blessed.screen();
 
 //exit when user preses one of the quit keys
@@ -11,37 +12,137 @@ screen.key(['escape', 'q', 'C-c'], function(ch, key) {
 });
 
 
+//Setup the GUI
 var StyleConfig = require('./include/config.js');
 var gui_code = require('./include/gui.js');
 var gui = gui_code.browser_gui_setup(screen, blessed, StyleConfig);
 var bless_tab_gui = gui_code.tab_gui_setup(gui, blessed, StyleConfig)
 var Page, DOMSnapshot, LayerTree, Emulation, Target, Input;
 
+//Helper to convert betwen terminal space and browser space
+var terminalConverter = {
+    FontSize: 12,//the font size of the console 
+    FontAspectRatio: 0.5833333, //The asspect ratio of the console font //We use the Courier font as is is the most comon monospace font
+    browserSize: {},
+
+	//gets the simulated pixel width and height of the browser
+    getBrowserSize: function(){
+        terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*gui.view_port.width);
+        terminalConverter.browserSize.height = Math.round(terminalConverter.FontSize*gui.view_port.height);
+
+        return(terminalConverter.browserSize);
+    },
+	
+	//gets the x pixel in the browser based on a character x position in the console
+    getBrowserX: function(TerminalX){
+        return(Math.round(TerminalX*terminalConverter.FontSize*terminalConverter.FontAspectRatio));
+    },
+	//gets the y pixel in the browser based on a character x position in the console
+    getBrowserY: function(TerminalY){
+        return(Math.round(TerminalY*terminalConverter.FontSize));
+    },
+	//gets the x position in the console based on a x pixel in the browser
+    getTerminalX: function(browserX){
+        return(Math.round(browserX/(terminalConverter.FontSize*terminalConverter.FontAspectRatio)));
+    },
+	//gets the y position in the console based on a y pixel in the browser
+    getTerminalY: function(browserY){
+        return(Math.round(browserY/terminalConverter.FontSize));
+    }
+};
+
+//Caclulate wanted browser size but chrome will use the size it wants unless it is headless
+terminalConverter.getBrowserSize();
+
+
+
+//Open a conection to chrome
+CDP(function(recived_client){
+		client = recived_client;
+		Page = client.Page;
+		Target = client.Target;
+		DOMSnapshot = client.DOMSnapshot;
+		LayerTree = client.LayerTree
+		Input = client.Input
+		Emulation = client.Emulation;
+
+		
+		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
+		.then(function(){
+			gui.console_box.unshiftLine('Tried to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
+			handle_browser_tab(client);
+		}).catch(function(err){
+			console.log("Failed to set browser size", err);
+			process.exit(0);
+		});
+
+    }).on('error', function(err){
+		// cannot connect to the remote endpoint
+		console.error("Could not connect to chrome: ",err);
+		console.log("start chrome: google-chrome --headless --remote-debugging-port=9222 ''")
+		///Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+});
+
+
+
+
+//User presses ctrl+r for a reload
+screen.key(['C-r'], function(ch, key) {
+	update_view_port();
+	screen.render();
+});
+
+screen.key(['pageup'], function(ch, key) {//PgUp
+	bless_tab_gui.view_port.scroll(-5);
+	screen.render();
+});
+screen.key(['pagedown'], function(ch, key) {//PgDown
+	bless_tab_gui.view_port.scroll(5);
+	screen.render();
+});
+
+//Debug find key name
+/*screen.on('keypress', function(ch, key) {
+	console.log('ch', ch, 'key', key)
+});*/
+
+screen.key(['backspace'], function(ch, key) {
+	//Tell chrome that we want to go back
+});
+
+//when the terminal is resized we need to re render
+screen.on('resize', function(){
+    gui.view_port.height = screen.height - gui.top_menu.height - gui.console_box.height;
+    terminalConverter.getBrowserSize();
+	update_view_port();
+	screen.render();
+ 
+});
+
+
 
 //When we press the debug button we show the screen size and try to reset it
 bless_tab_gui.debug_button.on('press', function(){
 	Promise.all([
 		Page.getLayoutMetrics(),
-		Target.getTargets()
 	])
 	.then(function(val){
 		metr = val[0];
 		gui.console_box.unshiftLine('The VisibleSize is width: '+metr.layoutViewport.clientWidth+' height: '+metr.layoutViewport.clientHeight);
 		screen.render();
-		//console.log(val[1])
+	}).catch(function(err){
+		console.log("Failed to get browser size", err);
+		process.exit(0);
+	});
+
+	//Chrome resets its size to 800x600 so we need to reset it from time to time
+	Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
+	.then(function(){
+		gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
 	}).catch(function(err){
 		console.log("Failed to set browser size", err);
 		process.exit(0);
 	});
-	
-		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
-		.then(function(){
-			gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
-		}).catch(function(err){
-			console.log("Failed to set browser size", err);
-			process.exit(0);
-		});
-	
 });
 
 
@@ -178,7 +279,6 @@ function render_from_dom(dom_snap, view_port){
 						bless_data.style.bg = rgb
 					}else{
 						if(dom_style['background-image'] && dom_style['background-image'] != 'none'){
-							//console.log(dom_style['background-image']);
 							//Show checker patern or (asci image is next level stuff)
 							bless_data.style.bg = "#7f7f7f";
 							draw = 'image';
@@ -220,7 +320,7 @@ function render_from_dom(dom_snap, view_port){
 
 }
 
-//Great to use to see alla boxes
+//Great to use for debuging when everything is white it is hard to se what is what
 function getRandomColor() {
   var letters = '0123456789ABCDEF';
   var color = '#';
@@ -296,7 +396,7 @@ function handle_browser_tab(){
     ]).then(function(values){
 		gui.console_box.unshiftLine('The VisibleSize is width: '+values[1].layoutViewport.clientWidth+' height: '+values[1].layoutViewport.clientHeight);
 
-		//Excute this script on the page to make the font size less of an issue
+		//Excute this script on the page to make the terminals lack of variable font size less of an issue
         Page.addScriptToEvaluateOnNewDocument({source: 
 'font_interval=setInterval(function(){if(document.body){elems = document.body.getElementsByTagName("*");for(i in elems){if(elems[i].style){elems[i].style.fontFamily = "courier";elems[i].style.lineHeight= "1";elems[i].style.fontSize = "12px";elems[i].style.verticalAlign = "inherit";}}}else{/*clearInterval(font_interval)*/}},100);'
 })
@@ -308,8 +408,7 @@ function handle_browser_tab(){
 			process.exit(0);
 		});
 
-		//var url = 'https://github.com/callesg/termkit';
-		var url = 'http://news.ycombinator.com/';
+		var url = 'https://github.com/callesg/termkit';//Default URL
 		bless_tab_gui.addres_bar_url_input.setValue(url);
 		screen.render();
 		navigate();
@@ -319,143 +418,6 @@ function handle_browser_tab(){
     });
 
 }
-
-//Open a conection to chrome we start with an active page use the Target Domain to Create and alter tabs
-CDP(function(recived_client){
-		client = recived_client;
-		Page = client.Page;
-		Target = client.Target;
-		DOMSnapshot = client.DOMSnapshot;
-		LayerTree = client.LayerTree
-		Input = client.Input
-		Emulation = client.Emulation;
-
-		
-		Emulation.setVisibleSize({width: terminalConverter.browserSize.width, height: terminalConverter.browserSize.height})
-		.then(function(){
-			gui.console_box.unshiftLine('Tired to set the VisibleSize to width: '+terminalConverter.browserSize.width+' height: '+terminalConverter.browserSize.height);
-			handle_browser_tab(client);
-		}).catch(function(err){
-			console.log("Failed to set browser size", err);
-			process.exit(0);
-		});
-
-    }).on('error', function(err){
-		// cannot connect to the remote endpoint
-		console.error(err);
-		console.log("start chrome: google-chrome --headless --remote-debugging-port=9222 ''")
-		///Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
-});
-
-
-//Helper to convert betwen terminal space and browser space
-var terminalConverter = {
-    FontSize: 12,//the font size of the console 
-    FontAspectRatio: 0.5833333, //The asspect ratio of the console font //We use the Courier font as is is the most comon monospace font
-    browserSize: {},
-
-	//gets the simulated pixel width and height of the browser
-    getBrowserSize: function(){
-        terminalConverter.browserSize.width = Math.round(terminalConverter.FontSize*terminalConverter.FontAspectRatio*gui.view_port.width);
-        terminalConverter.browserSize.height = Math.round(terminalConverter.FontSize*gui.view_port.height);
-
-        return(terminalConverter.browserSize);
-    },
-	
-	//gets the x pixel in the browser based on a character x position in the console
-    getBrowserX: function(TerminalX){
-        return(Math.round(TerminalX*terminalConverter.FontSize*terminalConverter.FontAspectRatio));
-    },
-	//gets the y pixel in the browser based on a character x position in the console
-    getBrowserY: function(TerminalY){
-        return(Math.round(TerminalY*terminalConverter.FontSize));
-    },
-	//gets the x position in the console based on a x pixel in the browser
-    getTerminalX: function(browserX){
-        return(Math.round(browserX/(terminalConverter.FontSize*terminalConverter.FontAspectRatio)));
-    },
-	//gets the y position in the console based on a y pixel in the browser
-    getTerminalY: function(browserY){
-        return(Math.round(browserY/terminalConverter.FontSize));
-    },
-	//dont Know what this does XXXXX
-	getTerminalPos: function(Pos, Size, BrowsPosRelativeTo, IsLayer){
-		var PosRelativeTo = [0,0];
-        if(typeof(BrowsPosRelativeTo) != 'undefined'){
-			PosRelativeTo = [terminalConverter.getTerminalX(BrowsPosRelativeTo[0]), terminalConverter.getTerminalY(BrowsPosRelativeTo[1])];
-		}
-		var OnlyPos = false;
-        if(!Size){
-			Size = [0,0];
-			OnlyPos = true;
-		}
-        var Rets = {
-            left: terminalConverter.getTerminalX(Pos[0])-PosRelativeTo[0],
-            top: terminalConverter.getTerminalY(Pos[1])-PosRelativeTo[1],
-            right: terminalConverter.getTerminalX(Pos[0]+ Size[0])-PosRelativeTo[0],
-            bottom: terminalConverter.getTerminalY(Pos[1]+ Size[1])-PosRelativeTo[1],
-        };
-		if(OnlyPos){
-			return(Rets);
-		}
-        Rets.width = Rets.right - Rets.left;
-        Rets.height = Rets.bottom - Rets.top;
-        if(Rets.width <= 0 || Rets.height <= 0){
-			if(IsLayer){
-				Rets.width = 0;
-				Rets.height = 0;
-			}else{
-				return(false);
-			}
-        }
-        return(Rets);
-    }
-};
-
-//Caclulate wanted browser size but chrome will use the size it wants unless it is headless
-terminalConverter.getBrowserSize();
-
-//User presses ctrl+r for a reload
-screen.key(['C-r'], function(ch, key) {
-	
-	update_view_port();
-	screen.render();
-});
-screen.key(['pageup'], function(ch, key) {//PgUp
-	//BlessChangeScroll(-Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
-	//BlessChangeScroll(-1, Tabs[termKitState.ActiveTab].ViewPort);
-    //screen.render();//Manual scroll does not call render
-});
-screen.key(['pagedown'], function(ch, key) {//PgDown
-	//BlessChangeScroll(Math.round(settings.ScrollMultiplier*ViewPort.height), Tabs[termKitState.ActiveTab].ViewPort);
-	//BlessChangeScroll(1, Tabs[termKitState.ActiveTab].ViewPort);
-    //screen.render();//Manual scroll does not call render
-});
-
-//Debug find key name
-/*screen.on('keypress', function(ch, key) {
-	console.log('ch', ch, 'key', key)
-});*/
-
-screen.key(['backspace'], function(ch, key) {
-	//Tabs[termKitState.ActiveTab].PhantomTab.goBack()
-	
-	//BrowserActions.clearTab(Tabs[termKitState.ActiveTab]);
-	//screen.render();
-
-    //renderTab(Tabs[termKitState.ActiveTab], function(){
-        //screen.render();
-    //});
-});
-
-screen.on('resize', function(){
-    gui.view_port.height = screen.height - gui.top_menu.height - gui.console_box.height;
-    terminalConverter.getBrowserSize();
-	update_view_port();
-	screen.render();
- 
-});
-
 var SelectebleElementTypes = [
 	"A",
 	"INPUT",
@@ -538,25 +500,6 @@ function FillChecker(Box){
 		}
 	}
 	
-}
-
-function BlessGetScroll(Box){
-	return(Box.childBase);
-}
-function BlessChangeScroll(Lines, Box){
-	//Box.childBase = Lines;
-	//Box.childOffset = Lines;
-	Box.setScroll(Box.childBase+Box.childOffset+Lines)
-	//Box.setScroll(Box.childBase+Box.childOffset+Lines)
-	
-	//var NrOfScrollableLines = Box.getScrollHeight();// - Box.height;
-	//var PercentChange = Lines/NrOfScrollableLines;
-	//('Lines', Lines, 'Tot', NrOfScrollableLines, 'He', Box.height, 'PercentChange', PercentChange)
-	//sysEvents.OnPhantomNotice("Before", "InArea", Box.getScrollHeight(), 'Scroll', Lines, 'CurrScroll', Box.getScroll(), 'Perc', Box.getScrollPerc(),'Chnage', PercentChange, 'childBase', Box.childBase,'childOffset', Box.childOffset);
-	//Box.scroll(Lines);
-	//Box.setScrollPerc(((Box.getScrollPerc()/100)+PercentChange) * 100)
-	//Box.childBase = 0;
-	//sysEvents.OnPhantomNotice("After", "InArea", Box.getScrollHeight(), 'Scroll', Lines, 'CurrScroll', Box.getScroll(), 'Perc', Box.getScrollPerc(), 'childBase', Box.childBase,'childOffset', Box.childOffset);
 }
 
 function dump(In){

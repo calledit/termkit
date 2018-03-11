@@ -1,12 +1,13 @@
 # WebKit based browser for the terminal.
 Based on nodejs, chrome-remote-interface, and blessed
+I belive that chrome-remote-interface requires node v8.
 
-To enter a new url press the urlbar with our mouse
-scroll with your mouse scroll wheel
+To enter a new url press the urlbar with your mouse
+scroll with your mouse scroll wheel or pgup and pgdown
 
 ## Status
 
-Simple pages renders and are somewhat readable :)
+Simpler pages renders and are somewhat readable :)
 
 ## Looking for contributors
 Please come and help with the project. 
@@ -35,12 +36,12 @@ google-chrome --headless --remote-debugging-port=9222
 node termkit.js
 
 #Your terminal emulator needs mouse support
-#To scroll use your mouse scroll wheel. To browse to a website use the address bar or click on links. (the clicking is not perfect and does not always work TODO someone FIX clicking)
+#To scroll use pageup & pagedown keys or your mouse scroll wheel. To browse to a website use the address bar or click on links. (the clicking is not perfect and does not always work TODO someone FIX clicking)
 #Sometimes website are not renderd properly at load time, use Ctr+R to refresh the render.
 #When you scroll hold your mouse to the side, if you scroll and the currsor is above a link the page will not scroll.
 #Exit the browser with Esc or Q
 
-#TODO someone add keyboard support
+#TODO someone add proper keyboard support
 
 ```
 
