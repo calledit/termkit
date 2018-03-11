@@ -40,6 +40,7 @@ node termkit.js
 #Your terminal emulator needs mouse suport
 #To scroll use your mouse scroll wheel. To browse to a website use the address bar or click on links. (the clicking is not perfect and does not always work TODO someone FIX clicking)
 #Sometimes website are not renderd properly at load time, use Ctr+R to refresh the render.
+#When you scroll hold your mouse to the side, if you scroll and the currsor is above a link the page will not scroll.
 #Exit the browser with Esc or Q
 
 #TODO someone add keyboard support
