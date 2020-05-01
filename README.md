@@ -1,7 +1,7 @@
 # WebKit based browser for the terminal.
 Built with nodejs, chrome-remote-interface, and blessed
 
-To enter a new url press the urlbar with your mouse
+To enter a new url press the urlbar with your mouse,
 scroll with your mouse scroll wheel or pgup and pgdown
 
 ## Status
