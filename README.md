@@ -17,7 +17,7 @@ Please come and help with the project.
 
 ## Install
 ```bash
-git clone https://github.com/callesg/termkit.git
+git clone https://github.com/calledit/termkit.git
 cd termkit
 #Get dependencies
 ./build.sh
