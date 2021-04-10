@@ -4,7 +4,7 @@
 #sudo apt-get install nodejs
 
 #As we allready have a copy of termkit this is not needed
-#git clone https://github.com/callesg/termkit.git
+#git clone https://github.com/calledit/termkit.git
 #cd termkit
 
 #Install js modules
@@ -19,5 +19,5 @@ then
 fi
 
 cd node_modules
-git clone https://github.com/callesg/blessed
+git clone https://github.com/calledit/blessed
 cd ..
